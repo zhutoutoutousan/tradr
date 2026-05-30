@@ -1,0 +1,82 @@
+[
+  {
+    "id": "eurusd",
+    "name": "EUR/USD",
+    "kind": "forex",
+    "bars": 1301,
+    "from": "2021-05-30",
+    "to": "2026-05-29"
+  },
+  {
+    "id": "gbpusd",
+    "name": "GBP/USD",
+    "kind": "forex",
+    "bars": 1301,
+    "from": "2021-05-30",
+    "to": "2026-05-29"
+  },
+  {
+    "id": "usdjpy",
+    "name": "USD/JPY",
+    "kind": "forex",
+    "bars": 1301,
+    "from": "2021-05-30",
+    "to": "2026-05-30"
+  },
+  {
+    "id": "audusd",
+    "name": "AUD/USD",
+    "kind": "forex",
+    "bars": 1301,
+    "from": "2021-05-30",
+    "to": "2026-05-30"
+  },
+  {
+    "id": "xauusd",
+    "name": "Gold (XAU/USD)",
+    "kind": "commodity",
+    "bars": 1257,
+    "from": "2021-06-01",
+    "to": "2026-05-29"
+  },
+  {
+    "id": "btcusd",
+    "name": "Bitcoin (BTC/USD)",
+    "kind": "crypto",
+    "bars": 1600,
+    "from": "2022-01-12",
+    "to": "2026-05-30"
+  },
+  {
+    "id": "aapl",
+    "name": "Apple (AAPL)",
+    "kind": "stock",
+    "bars": 1255,
+    "from": "2021-06-01",
+    "to": "2026-05-29"
+  },
+  {
+    "id": "msft",
+    "name": "Microsoft (MSFT)",
+    "kind": "stock",
+    "bars": 1255,
+    "from": "2021-06-01",
+    "to": "2026-05-29"
+  },
+  {
+    "id": "nvda",
+    "name": "NVIDIA (NVDA)",
+    "kind": "stock",
+    "bars": 1255,
+    "from": "2021-06-01",
+    "to": "2026-05-29"
+  },
+  {
+    "id": "tsla",
+    "name": "Tesla (TSLA)",
+    "kind": "stock",
+    "bars": 1255,
+    "from": "2021-06-01",
+    "to": "2026-05-29"
+  }
+]
