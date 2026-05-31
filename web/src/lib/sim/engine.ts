@@ -77,6 +77,7 @@ export class GameEngine {
   market: IMarket;
   player: Trader;
   bots: Trader[];
+  ticks = 0; // gameplay ticks elapsed (excludes market warmup)
 
   constructor(market: IMarket, cfg: EngineConfig = {}) {
     this.market = market;
@@ -140,6 +141,7 @@ export class GameEngine {
 
   // Advance the simulation by one tick.
   step() {
+    this.ticks++;
     const newBar = this.market.tick();
     const price = this.market.currentPrice;
     const bar = this.market.bar;

@@ -8,6 +8,7 @@ export default function Home() {
         <nav className="flex items-center gap-6 text-sm text-slate-300">
           <a href="#how" className="hover:text-white">How it works</a>
           <a href="#pricing" className="hover:text-white">Pricing</a>
+          <Link href="/multiplayer" className="hover:text-white">Multiplayer</Link>
           <Link href="/play" className="rounded-md bg-emerald-500 px-4 py-2 font-semibold text-slate-950 hover:bg-emerald-400">
             Play now
           </Link>
@@ -27,19 +28,19 @@ export default function Home() {
           tape, a cluster of trading bots — running the exact strategies from a real MT5 expert advisor — fight for
           the top of the leaderboard. Can you beat them?
         </p>
-        <div className="mt-8 flex items-center justify-center gap-4">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
           <Link
             href="/play"
             className="rounded-lg bg-emerald-500 px-6 py-3 text-lg font-bold text-slate-950 hover:bg-emerald-400"
           >
             ▶ Play free
           </Link>
-          <a
-            href="#pricing"
-            className="rounded-lg border border-slate-700 px-6 py-3 text-lg font-semibold text-slate-200 hover:bg-slate-800"
+          <Link
+            href="/multiplayer"
+            className="rounded-lg border border-emerald-500/60 px-6 py-3 text-lg font-semibold text-emerald-300 hover:bg-emerald-500/10"
           >
-            Save your progress
-          </a>
+            ⚔ Multiplayer race
+          </Link>
         </div>
       </section>
 
@@ -51,8 +52,8 @@ export default function Home() {
             body="A synthetic price engine generates trends, consolidations and volatility — candle by candle, in real time."
           />
           <Feature
-            title="Bots that really trade"
-            body="RSI scalping, Darvas box breakouts and EMA slope strategies ported straight from the cluster-latest EA."
+            title="Six bots that really trade"
+            body="RSI scalping, EMA slope, trend-riding, MACD momentum, Bollinger reversion and Donchian breakouts — all racing you."
           />
           <Feature
             title="Full gameability"
@@ -79,7 +80,7 @@ export default function Home() {
           <PlanCard
             name="Pro"
             price="$9"
-            features={["Saved progress & stats", "Global leaderboards", "Future bots & markets", "Multiplayer (coming soon)"]}
+            features={["Saved progress & stats", "Global leaderboards", "Future bots & markets", "Multiplayer rooms"]}
             cta="Register & upgrade"
             href="/register"
             highlight

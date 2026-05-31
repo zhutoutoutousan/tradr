@@ -5,6 +5,7 @@ import Link from "next/link";
 import CandleChart from "@/components/CandleChart";
 import TraderCard from "@/components/TraderCard";
 import { useGame, type GameConfig } from "@/hooks/useGame";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 export interface MarketOption {
   id: string;
@@ -35,6 +36,8 @@ export default function GameView({
   onSelect: (id: string) => void;
 }) {
   const { snapshot, running, speed, speedIdx, speeds, controls } = useGame(config);
+  const isMobile = useIsMobile();
+  const chartHeight = isMobile ? 300 : 440;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -127,6 +130,9 @@ export default function GameView({
             bar {snapshot.bar}
             {snapshot.date ? ` · ${snapshot.date}` : ""}
           </span>
+          <Link href="/multiplayer" className="hidden text-xs text-emerald-400 hover:underline sm:inline">
+            ⚔ Multiplayer
+          </Link>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -152,27 +158,39 @@ export default function GameView({
         </div>
       </header>
 
-      <main className="grid gap-4 p-4 lg:grid-cols-[1fr_360px]">
+      <main className="grid gap-4 p-3 pb-28 sm:p-4 lg:grid-cols-[1fr_360px] lg:pb-4">
         <section className="space-y-4">
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
-            <div className="mb-2 flex items-center justify-between">
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-2 sm:p-3">
+            <div className="mb-2 flex items-center justify-between px-1">
               <div>
                 <div className="text-sm font-semibold">{snapshot.label}</div>
-                <div className="font-mono text-2xl tabular-nums">{snapshot.price.toFixed(snapshot.price < 10 ? 4 : 2)}</div>
+                <div className="font-mono text-xl tabular-nums sm:text-2xl">
+                  {snapshot.price.toFixed(snapshot.price < 10 ? 4 : 2)}
+                </div>
               </div>
               <div className="text-right">
                 <div className="text-xs text-slate-500">Your equity</div>
-                <div className="font-mono text-xl tabular-nums">{money(p.equity)}</div>
+                <div className="font-mono text-lg tabular-nums sm:text-xl">{money(p.equity)}</div>
                 <div className={`font-mono text-sm ${p.returnPct >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                   {p.returnPct >= 0 ? "+" : ""}
                   {p.returnPct.toFixed(2)}%
                 </div>
               </div>
             </div>
-            <CandleChart candles={snapshot.candles} position={p.position} botPositions={botPositions} />
+            <CandleChart
+              candles={snapshot.candles}
+              position={p.position}
+              botPositions={botPositions}
+              height={chartHeight}
+              enableMouseTrading={!isMobile}
+              onBuy={controls.long}
+              onSell={controls.short}
+              onClose={controls.close}
+            />
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+          {/* Desktop controls + stats card */}
+          <div className="hidden rounded-xl border border-slate-800 bg-slate-900/60 p-4 lg:block">
             <div className="grid grid-cols-3 gap-3">
               <button onClick={controls.long} className="rounded-lg bg-emerald-600 py-3 font-bold hover:bg-emerald-500">
                 Long <span className="opacity-60">(B)</span>
@@ -185,7 +203,7 @@ export default function GameView({
               </button>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+            <div className="mt-4 grid grid-cols-4 gap-4 text-sm">
               <Stat label="Balance" value={money(p.balance)} />
               <Stat
                 label="Open P&L"
@@ -200,9 +218,24 @@ export default function GameView({
             </div>
           </div>
 
-          <p className="text-center text-xs text-slate-500">
-            Shortcuts: <kbd>B</kbd> long · <kbd>S</kbd> short · <kbd>C</kbd> close · <kbd>Space</kbd> pause ·{" "}
-            <kbd>F</kbd> fast-forward · <kbd>1–4</kbd> speed
+          {/* Mobile compact stats strip */}
+          <div className="grid grid-cols-4 gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs lg:hidden">
+            <Stat label="Balance" value={money(p.balance)} />
+            <Stat
+              label="Open P&L"
+              value={`${p.unrealized >= 0 ? "+" : ""}${money(p.unrealized)}`}
+              tone={p.unrealized >= 0 ? "up" : "down"}
+            />
+            <Stat
+              label="Position"
+              value={p.position ? p.position.side.toUpperCase() : "Flat"}
+            />
+            <Stat label="Trades" value={`${p.trades}`} />
+          </div>
+
+          <p className="hidden text-center text-xs text-slate-500 lg:block">
+            Mouse: left-click chart to buy · right-click to sell · middle-click to close · or{" "}
+            <kbd>B</kbd>/<kbd>S</kbd>/<kbd>C</kbd> · <kbd>Space</kbd> pause · <kbd>F</kbd> speed
           </p>
         </section>
 
@@ -221,13 +254,26 @@ export default function GameView({
           <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-400">
             <p className="mb-1 font-semibold text-slate-300">The bots</p>
             <p>
-              Each bot runs a strategy ported from the MT5 <code>cluster-latest</code> expert advisor — RSI scalping,
-              Darvas box breakouts and EMA slope/distance — trading the same feed you see. Pick a real market above to
-              replay 5 years of daily history, or stay on the synthetic feed.
+              Six bots run strategies ported from the MT5 <code>cluster-latest</code> expert advisor — RSI scalping, EMA
+              slope, trend-riding, MACD, Bollinger reversion and Donchian breakouts — trading the same feed you see. Pick
+              a real market above to replay 5 years of daily history, or stay on the synthetic feed.
             </p>
           </div>
         </aside>
       </main>
+
+      {/* Mobile sticky trade bar */}
+      <div className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-3 gap-2 border-t border-slate-800 bg-slate-900/95 p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
+        <button onClick={controls.long} className="rounded-lg bg-emerald-600 py-3.5 text-base font-bold active:bg-emerald-500">
+          Long
+        </button>
+        <button onClick={controls.close} className="rounded-lg bg-slate-700 py-3.5 text-base font-bold active:bg-slate-600">
+          Close
+        </button>
+        <button onClick={controls.short} className="rounded-lg bg-rose-600 py-3.5 text-base font-bold active:bg-rose-500">
+          Short
+        </button>
+      </div>
     </div>
   );
 }
