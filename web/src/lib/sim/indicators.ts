@@ -56,3 +56,32 @@ export function atr(candles: Candle[], period = 14): number {
   }
   return sum / period;
 }
+
+// Simple moving average over the last `period` values.
+export function smaLast(values: number[], period: number): number {
+  if (values.length < period) return NaN;
+  let s = 0;
+  for (let i = values.length - period; i < values.length; i++) s += values[i];
+  return s / period;
+}
+
+// Population standard deviation over the last `period` values.
+export function stdLast(values: number[], period: number): number {
+  if (values.length < period) return NaN;
+  const m = smaLast(values, period);
+  let s = 0;
+  for (let i = values.length - period; i < values.length; i++) {
+    const d = values[i] - m;
+    s += d * d;
+  }
+  return Math.sqrt(s / period);
+}
+
+// MACD line + signal line aligned with `closes`.
+export function macd(closes: number[], fast = 12, slow = 26, signalPeriod = 9) {
+  const ef = ema(closes, fast);
+  const es = ema(closes, slow);
+  const line = closes.map((_, i) => ef[i] - es[i]);
+  const signal = ema(line, signalPeriod);
+  return { macd: line, signal };
+}

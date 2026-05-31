@@ -1,5 +1,5 @@
 import type { Candle, Position, Side } from "./types";
-import { rsi, ema } from "./indicators";
+import { rsi, ema, smaLast, stdLast, macd } from "./indicators";
 
 export interface BarContext {
   candles: Candle[]; // closed candles only (oldest -> newest)
@@ -23,8 +23,6 @@ export interface Strategy {
 
 // ---------------------------------------------------------------------------
 // RSI Scalping  (ported from Strategies/RSIScalpingStrategy.mqh)
-//  - Entry: RSI crosses back out of oversold/overbought across two closed bars
-//  - Exit:  RSI reaches target, or stays against the position for BarsToWait
 // ---------------------------------------------------------------------------
 const RSI_PERIOD = 14;
 const RSI_OVERSOLD = 30;
@@ -74,7 +72,6 @@ export const rsiScalping: Strategy = {
       return null;
     }
 
-    // Flat: look for cross out of extreme zones.
     if (twoAgo <= RSI_OVERSOLD && prev > RSI_OVERSOLD) {
       return { open: { side: "long", slPct: 0.02, tpPct: 0.03 } };
     }
@@ -86,56 +83,7 @@ export const rsiScalping: Strategy = {
 };
 
 // ---------------------------------------------------------------------------
-// Darvas Box  (ported from Strategies/DarvasBoxStrategy.mqh)
-//  - Forms a box when the last N bars consolidate inside an allowed range
-//  - Buys on breakout above the box on a volume spike, sells on breakdown
-// ---------------------------------------------------------------------------
-const DB_BOX_PERIOD = 20;
-const DB_ALLOWED_RANGE_PCT = 0.025; // consolidation tightness
-const DB_VOL_MULT = 1.3;
-
-export const darvasBox: Strategy = {
-  id: "darvas-box",
-  name: "Darvas Box",
-  color: "#f59e0b",
-  blurb: "Detects price consolidation boxes and rides breakouts with volume confirmation.",
-  onBar(ctx, pos) {
-    const c = ctx.candles;
-    if (c.length < DB_BOX_PERIOD + 2) return null;
-
-    if (pos) {
-      // Box strategy exits are handled by SL/TP in the engine.
-      return null;
-    }
-
-    const window = c.slice(c.length - DB_BOX_PERIOD);
-    let hi = -Infinity;
-    let lo = Infinity;
-    let volSum = 0;
-    for (const k of window) {
-      if (k.high > hi) hi = k.high;
-      if (k.low < lo) lo = k.low;
-      volSum += k.volume;
-    }
-    const range = hi - lo;
-    const allowed = DB_ALLOWED_RANGE_PCT * ctx.price;
-    if (range > allowed) return null; // no box formed
-
-    const last = c[c.length - 1];
-    const avgVol = volSum / window.length;
-    const volSpike = last.volume > avgVol * DB_VOL_MULT;
-    if (!volSpike) return null;
-
-    if (ctx.price > hi) return { open: { side: "long", slPct: 0.02, tpPct: 0.04 } };
-    if (ctx.price < lo) return { open: { side: "short", slPct: 0.02, tpPct: 0.04 } };
-    return null;
-  },
-};
-
-// ---------------------------------------------------------------------------
 // EMA Slope + Distance  (ported from Strategies/EMASlopeDistanceStrategy.mqh)
-//  - Arms when price is far from EMA AND the EMA slope is strong
-//  - Trades in the direction of price vs EMA, exits on the EMA cross-back
 // ---------------------------------------------------------------------------
 const ES_EMA_PERIOD = 50;
 const ES_PRICE_THRESH_PCT = 0.004;
@@ -184,4 +132,136 @@ export const emaSlope: Strategy = {
   },
 };
 
-export const ALL_STRATEGIES: Strategy[] = [rsiScalping, darvasBox, emaSlope];
+// ---------------------------------------------------------------------------
+// Trend Rider  (dual-EMA crossover, in the spirit of SuperEMAStrategy.mqh)
+// ---------------------------------------------------------------------------
+const TR_FAST = 10;
+const TR_SLOW = 30;
+
+export const trendRider: Strategy = {
+  id: "trend-rider",
+  name: "Trend Rider",
+  color: "#f59e0b",
+  blurb: "Rides momentum: goes long on a fast/slow EMA golden cross, flips on the death cross.",
+  onBar(ctx, pos) {
+    const fast = ema(ctx.closes, TR_FAST);
+    const slow = ema(ctx.closes, TR_SLOW);
+    const n = ctx.closes.length;
+    if (n < TR_SLOW + 2) return null;
+    const fNow = fast[n - 1];
+    const fPrev = fast[n - 2];
+    const sNow = slow[n - 1];
+    const sPrev = slow[n - 2];
+    const crossUp = fPrev <= sPrev && fNow > sNow;
+    const crossDn = fPrev >= sPrev && fNow < sNow;
+
+    if (pos) {
+      if (pos.side === "long" && crossDn) return { close: true };
+      if (pos.side === "short" && crossUp) return { close: true };
+      return null;
+    }
+    if (crossUp) return { open: { side: "long", slPct: 0.03 } };
+    if (crossDn) return { open: { side: "short", slPct: 0.03 } };
+    return null;
+  },
+};
+
+// ---------------------------------------------------------------------------
+// MACD Momentum  (MACD line / signal line crossover)
+// ---------------------------------------------------------------------------
+export const macdMomentum: Strategy = {
+  id: "macd-momentum",
+  name: "MACD Momentum",
+  color: "#f472b6",
+  blurb: "Trades MACD line / signal crossovers to catch momentum shifts early.",
+  onBar(ctx, pos) {
+    const { macd: m, signal: s } = macd(ctx.closes);
+    const n = ctx.closes.length;
+    if (n < 35) return null;
+    const mNow = m[n - 1];
+    const mPrev = m[n - 2];
+    const sNow = s[n - 1];
+    const sPrev = s[n - 2];
+    if ([mNow, mPrev, sNow, sPrev].some(Number.isNaN)) return null;
+    const crossUp = mPrev <= sPrev && mNow > sNow;
+    const crossDn = mPrev >= sPrev && mNow < sNow;
+
+    if (pos) {
+      if (pos.side === "long" && crossDn) return { close: true };
+      if (pos.side === "short" && crossUp) return { close: true };
+      return null;
+    }
+    if (crossUp) return { open: { side: "long", slPct: 0.03 } };
+    if (crossDn) return { open: { side: "short", slPct: 0.03 } };
+    return null;
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Bollinger Reversion  (mean reversion off the bands back to the mean)
+// ---------------------------------------------------------------------------
+const BB_PERIOD = 20;
+const BB_MULT = 2;
+
+export const bollingerReversion: Strategy = {
+  id: "bollinger-reversion",
+  name: "Bollinger Reversion",
+  color: "#2dd4bf",
+  blurb: "Fades extremes: buys a close below the lower band, sells above the upper, targets the mean.",
+  onBar(ctx, pos) {
+    const n = ctx.closes.length;
+    if (n < BB_PERIOD + 1) return null;
+    const mid = smaLast(ctx.closes, BB_PERIOD);
+    const sd = stdLast(ctx.closes, BB_PERIOD);
+    if (Number.isNaN(mid) || Number.isNaN(sd)) return null;
+    const upper = mid + BB_MULT * sd;
+    const lower = mid - BB_MULT * sd;
+    const price = ctx.price;
+
+    if (pos) {
+      if (pos.side === "long" && price >= mid) return { close: true };
+      if (pos.side === "short" && price <= mid) return { close: true };
+      return null;
+    }
+    if (price < lower) return { open: { side: "long", slPct: 0.03 } };
+    if (price > upper) return { open: { side: "short", slPct: 0.03 } };
+    return null;
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Donchian Breakout  (channel breakout trend follower)
+// ---------------------------------------------------------------------------
+const DC_PERIOD = 20;
+
+export const donchianBreakout: Strategy = {
+  id: "donchian-breakout",
+  name: "Donchian Breakout",
+  color: "#facc15",
+  blurb: "Buys breaks above the 20-bar high and sells breaks below the 20-bar low.",
+  onBar(ctx, pos) {
+    const c = ctx.candles;
+    if (c.length < DC_PERIOD + 1) return null;
+    if (pos) return null; // exits handled by SL/TP
+
+    const window = c.slice(c.length - DC_PERIOD);
+    let hh = -Infinity;
+    let ll = Infinity;
+    for (const k of window) {
+      if (k.high > hh) hh = k.high;
+      if (k.low < ll) ll = k.low;
+    }
+    if (ctx.price > hh) return { open: { side: "long", slPct: 0.025, tpPct: 0.05 } };
+    if (ctx.price < ll) return { open: { side: "short", slPct: 0.025, tpPct: 0.05 } };
+    return null;
+  },
+};
+
+export const ALL_STRATEGIES: Strategy[] = [
+  rsiScalping,
+  emaSlope,
+  trendRider,
+  macdMomentum,
+  bollingerReversion,
+  donchianBreakout,
+];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Candle, Position, Side } from "@/lib/sim/types";
 
 export interface BotMarker {
@@ -15,6 +15,11 @@ interface Props {
   position: Position | null;
   botPositions?: BotMarker[];
   height?: number;
+  // Desktop mouse trading: left = buy, right = sell, middle = close.
+  enableMouseTrading?: boolean;
+  onBuy?: () => void;
+  onSell?: () => void;
+  onClose?: () => void;
 }
 
 const BG = "#0b0f17";
@@ -23,9 +28,25 @@ const TEXT = "#5b6b82";
 const UP = "#26a69a";
 const DOWN = "#ef5350";
 
-export default function CandleChart({ candles, position, botPositions = [], height = 420 }: Props) {
+export default function CandleChart({
+  candles,
+  position,
+  botPositions = [],
+  height = 420,
+  enableMouseTrading = false,
+  onBuy,
+  onSell,
+  onClose,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const [resizeTick, setResizeTick] = useState(0);
+
+  useEffect(() => {
+    const on = () => setResizeTick((t) => t + 1);
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -49,12 +70,13 @@ export default function CandleChart({ candles, position, botPositions = [], heig
     ctx.fillStyle = BG;
     ctx.fillRect(0, 0, W, H);
 
-    const padR = 64;
-    const padB = 22;
+    const padR = 60;
+    const padB = 20;
     const plotW = W - padR;
     const plotH = H - padB;
 
-    const candleW = 7;
+    // Slightly wider candles on small screens so they remain legible.
+    const candleW = W < 480 ? 5 : 7;
     const gap = 2;
     const slot = candleW + gap;
     const maxVisible = Math.max(10, Math.floor(plotW / slot));
@@ -83,8 +105,8 @@ export default function CandleChart({ candles, position, botPositions = [], heig
     lo -= pad;
     const span = hi - lo;
     const y = (price: number) => ((hi - price) / span) * plotH;
+    const fmt = (p: number) => (p < 10 ? p.toFixed(4) : p.toFixed(2));
 
-    // Grid + price axis.
     ctx.strokeStyle = GRID;
     ctx.fillStyle = TEXT;
     ctx.font = "11px ui-monospace, monospace";
@@ -97,10 +119,9 @@ export default function CandleChart({ candles, position, botPositions = [], heig
       ctx.moveTo(0, py);
       ctx.lineTo(plotW, py);
       ctx.stroke();
-      ctx.fillText(price.toFixed(2), plotW + 6, py + 4);
+      ctx.fillText(fmt(price), plotW + 4, py + 4);
     }
 
-    // Candles.
     visible.forEach((c, i) => {
       const x = i * slot + candleW / 2 + 2;
       const up = c.close >= c.open;
@@ -119,7 +140,6 @@ export default function CandleChart({ candles, position, botPositions = [], heig
 
     const last = visible[visible.length - 1];
 
-    // Current price line.
     const lastY = y(last.close);
     ctx.strokeStyle = "#3b82f6";
     ctx.setLineDash([4, 3]);
@@ -131,10 +151,8 @@ export default function CandleChart({ candles, position, botPositions = [], heig
     ctx.fillStyle = "#3b82f6";
     ctx.fillRect(plotW, lastY - 8, padR, 16);
     ctx.fillStyle = "#fff";
-    ctx.fillText(last.close.toFixed(2), plotW + 4, lastY + 4);
+    ctx.fillText(fmt(last.close), plotW + 3, lastY + 4);
 
-    // Bot open positions (competition view): faint colored line + a direction
-    // marker at the right edge so you can see where each robot is positioned.
     ctx.font = "10px ui-monospace, monospace";
     for (const b of botPositions) {
       const py = y(b.entry);
@@ -148,7 +166,6 @@ export default function CandleChart({ candles, position, botPositions = [], heig
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;
 
-      // Triangle marker pointing in the trade direction.
       const mx = plotW - 8;
       ctx.fillStyle = b.color;
       ctx.beginPath();
@@ -170,7 +187,6 @@ export default function CandleChart({ candles, position, botPositions = [], heig
     }
     ctx.font = "11px ui-monospace, monospace";
 
-    // Position overlays.
     const drawLevel = (price: number, color: string, label: string) => {
       const py = y(price);
       ctx.strokeStyle = color;
@@ -184,15 +200,48 @@ export default function CandleChart({ candles, position, botPositions = [], heig
       ctx.fillText(label, 6, py - 4);
     };
     if (position) {
-      drawLevel(position.entry, position.side === "long" ? UP : DOWN, `${position.side.toUpperCase()} @ ${position.entry.toFixed(2)}`);
+      drawLevel(
+        position.entry,
+        position.side === "long" ? UP : DOWN,
+        `${position.side.toUpperCase()} @ ${fmt(position.entry)}`,
+      );
       if (position.sl) drawLevel(position.sl, "#f87171", "SL");
       if (position.tp) drawLevel(position.tp, "#4ade80", "TP");
     }
-  }, [candles, position, botPositions, height]);
+  }, [candles, position, botPositions, height, resizeTick]);
 
   return (
-    <div ref={wrapRef} className="w-full">
+    <div
+      ref={wrapRef}
+      className="relative w-full select-none"
+      style={enableMouseTrading ? { cursor: "crosshair" } : undefined}
+      onClick={enableMouseTrading ? () => onBuy?.() : undefined}
+      onContextMenu={
+        enableMouseTrading
+          ? (e) => {
+              e.preventDefault();
+              onSell?.();
+            }
+          : undefined
+      }
+      onAuxClick={
+        enableMouseTrading
+          ? (e) => {
+              if (e.button === 1) {
+                e.preventDefault();
+                onClose?.();
+              }
+            }
+          : undefined
+      }
+    >
       <canvas ref={canvasRef} className="block w-full rounded-lg" />
+      {enableMouseTrading && (
+        <div className="pointer-events-none absolute left-2 top-2 rounded bg-slate-900/70 px-2 py-1 text-[10px] text-slate-400">
+          L-click <span className="text-emerald-400">Buy</span> · R-click <span className="text-rose-400">Sell</span> ·
+          M-click Close
+        </div>
+      )}
     </div>
   );
 }
