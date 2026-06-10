@@ -9,7 +9,7 @@ export interface DanmakuItem {
   color: string;
 }
 
-export default function DanmakuOverlay({ items }: { items: DanmakuItem[] }) {
+export default function DanmakuOverlay({ items, enabled = true }: { items: DanmakuItem[]; enabled?: boolean }) {
   const [visible, setVisible] = useState<DanmakuItem[]>([]);
 
   useEffect(() => {
@@ -21,6 +21,8 @@ export default function DanmakuOverlay({ items }: { items: DanmakuItem[] }) {
     }, 9000);
     return () => clearTimeout(t);
   }, [items]);
+
+  if (!enabled) return null;
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg">

@@ -39,6 +39,32 @@ body {
   animation: danmaku-scroll 9s linear forwards;
 }
 
+@keyframes chat-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.chat-sheet {
+  animation: chat-sheet-up 0.22s ease-out;
+}
+
+@keyframes chat-sheet-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.chat-sheet-right {
+  animation: chat-sheet-right 0.2s ease-out;
+}
+
 kbd {
   border: 1px solid #334155;
   border-radius: 4px;
