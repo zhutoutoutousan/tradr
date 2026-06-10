@@ -33,7 +33,14 @@ export function equity(t: Trader, price: number): number {
   return t.account.balance + unrealized(t.account.position, price);
 }
 
-export function openPosition(t: Trader, side: Side, price: number, slPct?: number, tpPct?: number) {
+export function openPosition(
+  t: Trader,
+  side: Side,
+  price: number,
+  slPct?: number,
+  tpPct?: number,
+  openBar = 0,
+) {
   if (t.account.position) return; // one position at a time
   const notional = t.account.balance * t.exposure * t.exposureMult;
   const size = Math.max(0, notional / price);
@@ -50,7 +57,7 @@ export function openPosition(t: Trader, side: Side, price: number, slPct?: numbe
         ? price * (1 + tpPct)
         : price * (1 - tpPct)
       : undefined;
-  t.account.position = { side, entry: price, size, openBar: 0, sl, tp };
+  t.account.position = { side, entry: price, size, openBar, sl, tp };
 }
 
 export function closePosition(t: Trader, price: number, bar: number) {
@@ -201,8 +208,7 @@ export class GameEngine {
     if (this.player.account.position?.side === "short")
       closePosition(this.player, this.market.currentPrice, this.market.bar);
     if (!this.player.account.position) {
-      openPosition(this.player, "long", this.market.currentPrice);
-      if (this.player.account.position) this.player.account.position.openBar = this.market.bar;
+      openPosition(this.player, "long", this.market.currentPrice, undefined, undefined, this.market.bar);
     }
   }
 
@@ -210,8 +216,7 @@ export class GameEngine {
     if (this.player.account.position?.side === "long")
       closePosition(this.player, this.market.currentPrice, this.market.bar);
     if (!this.player.account.position) {
-      openPosition(this.player, "short", this.market.currentPrice);
-      if (this.player.account.position) this.player.account.position.openBar = this.market.bar;
+      openPosition(this.player, "short", this.market.currentPrice, undefined, undefined, this.market.bar);
     }
   }
 
