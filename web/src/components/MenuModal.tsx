@@ -5,7 +5,6 @@ import Link from "next/link";
 import { ACHIEVEMENTS } from "@/lib/game/achievements";
 import { loadProfile, type Profile } from "@/lib/game/profile";
 import { deleteReview, isRegistered, loadReviews, type RoundReview } from "@/lib/game/reviews";
-import { fetchCommunityGames, type CommunityGame } from "@/lib/game/anonymousGames";
 
 type Tab = "play" | "community" | "achievements" | "history" | "pro";
 
@@ -21,33 +20,10 @@ export default function MenuModal({
   const [tab, setTab] = useState<Tab>("play");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [history, setHistory] = useState<RoundReview[]>([]);
-  const [community, setCommunity] = useState<CommunityGame[]>([]);
-  const [communityLoading, setCommunityLoading] = useState(false);
-
   useEffect(() => {
     setProfile(loadProfile());
     setHistory(loadReviews());
   }, []);
-
-  useEffect(() => {
-    if (tab !== "community") return;
-    let cancelled = false;
-    setCommunityLoading(true);
-    fetchCommunityGames(30)
-      .then((games) => {
-        if (!cancelled) {
-          const others = games.filter((g) => !g.isMine);
-          const mine = games.filter((g) => g.isMine);
-          setCommunity([...others, ...mine]);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setCommunityLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [tab]);
 
   const unlocked = new Set(profile?.unlocked ?? []);
 
@@ -115,58 +91,34 @@ export default function MenuModal({
                 <Link href="/multiplayer" className="rounded-lg border border-emerald-500/60 px-4 py-2 font-semibold text-emerald-300 hover:bg-emerald-500/10">
                   ⚔ Multiplayer race
                 </Link>
+                <Link
+                  href="/community"
+                  data-testid="menu-community-gallery"
+                  className="rounded-lg border border-sky-500/60 px-4 py-2 font-semibold text-sky-300 hover:bg-sky-500/10"
+                >
+                  Community gallery
+                </Link>
               </div>
             </div>
           )}
 
           {tab === "community" && (
-            <div className="space-y-3 text-sm">
+            <div className="space-y-4 text-sm">
               <p className="text-slate-400">
-                Recent rounds from other traders — tap to watch their chart and deal list.
+                Browse anonymous solo rounds from other traders in the community gallery. Open any match to replay their
+                chart and deal list on a full page.
               </p>
-              {communityLoading ? (
-                <p className="text-slate-500">Loading community runs…</p>
-              ) : community.length === 0 ? (
-                <p className="text-slate-500">
-                  No community runs yet. Finish a solo round and it will be saved anonymously for stats.
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {community.map((g) => (
-                    <li
-                      key={g.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2.5"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => onOpenReview?.(g.review)}
-                        className="min-w-0 flex-1 text-left active:text-emerald-300"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-slate-200">{g.marketLabel}</span>
-                          {g.isMine && (
-                            <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400">You</span>
-                          )}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {timeAgo(g.createdAt)} · #{g.rank} · {g.trades} trades ·{" "}
-                          <span className={g.returnPct >= 0 ? "text-emerald-400" : "text-rose-400"}>
-                            {g.returnPct >= 0 ? "+" : ""}
-                            {g.returnPct.toFixed(1)}%
-                          </span>
-                        </div>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onOpenReview?.(g.review)}
-                        className="shrink-0 rounded-lg border border-sky-500/50 px-2.5 py-1.5 text-xs font-semibold text-sky-300"
-                      >
-                        Watch
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <p className="text-slate-500">
+                Finish a solo round and yours is saved automatically. Filter by peers or your own runs.
+              </p>
+              <Link
+                href="/community"
+                data-testid="menu-community-gallery"
+                onClick={onClose}
+                className="inline-block rounded-lg bg-sky-600 px-5 py-2.5 font-semibold text-white hover:bg-sky-500"
+              >
+                Open community gallery →
+              </Link>
             </div>
           )}
 
@@ -269,16 +221,6 @@ export default function MenuModal({
       </div>
     </div>
   );
-}
-
-function timeAgo(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(ms / 60_000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
 }
 
 function TabBtn({ active, onClick, children, testId }: { active: boolean; onClick: () => void; children: React.ReactNode; testId?: string }) {
