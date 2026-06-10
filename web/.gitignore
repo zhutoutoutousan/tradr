@@ -11,11 +11,16 @@
 !.yarn/versions
 
 # testing
-/coverage
+coverage/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+demo-output/
 
 # next.js
-/.next/
-/out/
+.next/
+out/
 
 # production
 /build
@@ -39,3 +44,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# editor / os
+.vscode/
+.idea/
+*.swp
+*~

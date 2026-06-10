@@ -21,6 +21,7 @@ export interface IMarket {
   tick(): boolean; // advance one tick; returns true when a bar just closed
   view(): Candle[]; // closed candles + the forming candle
   closes(): number[];
+  peekDirection(bars?: number): number; // 1 up / -1 down / 0, for the Insider Tip power-up
 }
 
 export interface Position {

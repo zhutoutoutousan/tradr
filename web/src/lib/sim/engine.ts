@@ -1,4 +1,5 @@
 import { ALL_STRATEGIES, type Strategy } from "./strategies";
+import { BASE_ELO, type BotSpec } from "./botFactory";
 import type { Account, ClosedTrade, IMarket, Position, Side } from "./types";
 
 export const STARTING_BALANCE = 10000;
@@ -10,6 +11,9 @@ export interface Trader {
   color: string;
   blurb: string;
   exposure: number; // notional multiple of balance per trade
+  exposureMult: number; // transient multiplier (Leverage power-up); 1 normally
+  rating: number; // ELO; bots carry implied ratings, player rating is external
+  shieldActive: boolean; // Hedge Shield: refunds the next losing trade
   account: Account;
   strategy?: Strategy;
   state: Record<string, number>;
@@ -31,7 +35,7 @@ export function equity(t: Trader, price: number): number {
 
 export function openPosition(t: Trader, side: Side, price: number, slPct?: number, tpPct?: number) {
   if (t.account.position) return; // one position at a time
-  const notional = t.account.balance * t.exposure;
+  const notional = t.account.balance * t.exposure * t.exposureMult;
   const size = Math.max(0, notional / price);
   if (size <= 0) return;
   const sl =
@@ -52,7 +56,12 @@ export function openPosition(t: Trader, side: Side, price: number, slPct?: numbe
 export function closePosition(t: Trader, price: number, bar: number) {
   const pos = t.account.position;
   if (!pos) return;
-  const pnl = unrealized(pos, price);
+  let pnl = unrealized(pos, price);
+  // Hedge Shield refunds a single losing trade, then is consumed.
+  if (t.shieldActive && pnl < 0) {
+    pnl = 0;
+    t.shieldActive = false;
+  }
   t.account.balance += pnl;
   const trade: ClosedTrade = {
     side: pos.side,
@@ -73,13 +82,28 @@ export interface EngineConfig {
   botExposure?: number;
 }
 
+// Default field used when no roguelike specs are supplied (the synced
+// multiplayer race and any fallback). Mirrors the original six fixed bots.
+function defaultBotSpecs(exposure: number): BotSpec[] {
+  return ALL_STRATEGIES.map((s) => ({
+    id: s.id,
+    name: s.name,
+    color: s.color,
+    blurb: s.blurb,
+    exposure,
+    rating: BASE_ELO,
+    strategy: s,
+  }));
+}
+
 export class GameEngine {
   market: IMarket;
   player: Trader;
   bots: Trader[];
   ticks = 0; // gameplay ticks elapsed (excludes market warmup)
+  botsFrozen = false; // Freeze power-up: bots stop making decisions
 
-  constructor(market: IMarket, cfg: EngineConfig = {}) {
+  constructor(market: IMarket, bots?: BotSpec[], cfg: EngineConfig = {}) {
     this.market = market;
     this.player = {
       id: "you",
@@ -88,18 +112,25 @@ export class GameEngine {
       color: "#34d399",
       blurb: "Your discretionary trades.",
       exposure: cfg.playerExposure ?? 2,
+      exposureMult: 1,
+      rating: BASE_ELO,
+      shieldActive: false,
       account: newAccount(),
       state: {},
     };
-    this.bots = ALL_STRATEGIES.map((s) => ({
+    const specs = bots ?? defaultBotSpecs(cfg.botExposure ?? 2);
+    this.bots = specs.map((s) => ({
       id: s.id,
       kind: "bot" as const,
       name: s.name,
       color: s.color,
       blurb: s.blurb,
-      exposure: cfg.botExposure ?? 2,
+      exposure: s.exposure,
+      exposureMult: 1,
+      rating: s.rating,
+      shieldActive: false,
       account: newAccount(),
-      strategy: s,
+      strategy: s.strategy,
       state: {},
     }));
   }
@@ -150,8 +181,9 @@ export class GameEngine {
     this.checkStops(this.player, price, bar);
     for (const b of this.bots) this.checkStops(b, price, bar);
 
-    // Bot decisions run on bar close (matching the EA "new bar" logic).
-    if (newBar) {
+    // Bot decisions run on bar close (matching the EA "new bar" logic) unless
+    // the player has frozen the field with a power-up.
+    if (newBar && !this.botsFrozen) {
       for (const b of this.bots) this.runBot(b);
     }
 
@@ -168,15 +200,19 @@ export class GameEngine {
   playerLong() {
     if (this.player.account.position?.side === "short")
       closePosition(this.player, this.market.currentPrice, this.market.bar);
-    if (!this.player.account.position)
+    if (!this.player.account.position) {
       openPosition(this.player, "long", this.market.currentPrice);
+      if (this.player.account.position) this.player.account.position.openBar = this.market.bar;
+    }
   }
 
   playerShort() {
     if (this.player.account.position?.side === "long")
       closePosition(this.player, this.market.currentPrice, this.market.bar);
-    if (!this.player.account.position)
+    if (!this.player.account.position) {
       openPosition(this.player, "short", this.market.currentPrice);
+      if (this.player.account.position) this.player.account.position.openBar = this.market.bar;
+    }
   }
 
   playerClose() {

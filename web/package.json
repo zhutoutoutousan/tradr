@@ -9,7 +9,18 @@
     "start": "next start",
     "start:lan": "next start -H 0.0.0.0",
     "lint": "eslint",
-    "fetch-data": "node scripts/fetch-data.mjs"
+    "fetch-data": "node scripts/fetch-data.mjs",
+    "test:e2e": "playwright test --project=chromium",
+    "test:e2e:all": "playwright test",
+    "test:e2e:mobile": "playwright test --project=mobile",
+    "promo:record": "playwright test e2e/promo-cameo.spec.ts --project=promo-desktop",
+    "promo:record:mobile": "playwright test e2e/promo-cameo.spec.ts --project=promo-mobile",
+    "demo:generate": "node scripts/gen-e2e.mjs && playwright test e2e/sharp-demo.spec.ts --project=sharp-desktop && playwright test e2e/sharp-demo.spec.ts --project=sharp-mobile && node scripts/collect-demos.mjs",
+    "demo:sharp": "playwright test e2e/sharp-demo.spec.ts --project=sharp-desktop",
+    "demo:full": "playwright test e2e/sharp-demo.spec.ts --project=sharp-desktop -g \"complete journey\"",
+    "demo:flows": "node scripts/gen-e2e.mjs && playwright test e2e/user-flow-demos.spec.ts --project=flow-desktop && node scripts/collect-demos.mjs",
+    "demo:full-solo": "node scripts/gen-e2e.mjs && playwright test e2e/full-solo-demo.spec.ts --project=full-solo-desktop && node scripts/collect-demos.mjs",
+    "demo:full-solo:mobile": "node scripts/gen-e2e.mjs && playwright test e2e/full-solo-demo.spec.ts --project=full-solo-mobile && node scripts/collect-demos.mjs"
   },
   "dependencies": {
     "@stripe/stripe-js": "^9.7.0",
@@ -28,6 +39,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "@playwright/test": "^1.60.0"
   }
 }
