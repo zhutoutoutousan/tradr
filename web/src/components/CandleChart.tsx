@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Candle, Position, Side } from "@/lib/sim/types";
+import { buildOverlays } from "@/lib/game/chartOverlays";
+import type { ChartIndicator } from "@/lib/game/roundSetup";
 
 export interface BotMarker {
   label: string;
@@ -14,8 +16,11 @@ interface Props {
   candles: Candle[];
   position: Position | null;
   botPositions?: BotMarker[];
+  indicators?: ChartIndicator[];
   height?: number;
-  // Desktop mouse trading: left = buy, right = sell, middle = close.
+  /** Grow to fill the parent flex area (mobile portrait). */
+  fill?: boolean;
+  // Desktop mouse trading: left = long, right = close, middle = short.
   enableMouseTrading?: boolean;
   onBuy?: () => void;
   onSell?: () => void;
@@ -32,7 +37,9 @@ export default function CandleChart({
   candles,
   position,
   botPositions = [],
+  indicators = [],
   height = 420,
+  fill = false,
   enableMouseTrading = false,
   onBuy,
   onSell,
@@ -45,8 +52,14 @@ export default function CandleChart({
   useEffect(() => {
     const on = () => setResizeTick((t) => t + 1);
     window.addEventListener("resize", on);
-    return () => window.removeEventListener("resize", on);
-  }, []);
+    const wrap = wrapRef.current;
+    const ro = fill && wrap ? new ResizeObserver(on) : null;
+    ro?.observe(wrap!);
+    return () => {
+      window.removeEventListener("resize", on);
+      ro?.disconnect();
+    };
+  }, [fill]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -55,7 +68,8 @@ export default function CandleChart({
 
     const dpr = window.devicePixelRatio || 1;
     const cssW = wrap.clientWidth;
-    const cssH = height;
+    const cssH = fill ? wrap.clientHeight : height;
+    if (cssW <= 0 || cssH <= 0) return;
     canvas.width = Math.floor(cssW * dpr);
     canvas.height = Math.floor(cssH * dpr);
     canvas.style.width = `${cssW}px`;
@@ -73,7 +87,9 @@ export default function CandleChart({
     const padR = 60;
     const padB = 20;
     const plotW = W - padR;
-    const plotH = H - padB;
+    const hasOsc = indicators.some((i) => i.kind === "rsi" || i.kind === "macd");
+    const oscH = hasOsc ? Math.floor(H * 0.16) : 0;
+    const plotH = H - padB - oscH;
 
     // Slightly wider candles on small screens so they remain legible.
     const candleW = W < 480 ? 5 : 7;
@@ -99,6 +115,23 @@ export default function CandleChart({
       hi = Math.max(hi, b.entry);
       lo = Math.min(lo, b.entry);
     }
+
+    const overlayLines = indicators.length > 0 ? buildOverlays(candles, indicators) : [];
+    const priceLines = overlayLines.filter((l) => !l.dashed);
+    const oscLines = overlayLines.filter((l) => l.dashed);
+    const visStart = candles.length - visible.length;
+    for (const line of priceLines) {
+      for (let vi = 0; vi < visible.length; vi++) {
+        const gi = visStart + vi;
+        if (gi >= line.values.length) continue;
+        const v = line.values[gi];
+        if (!Number.isNaN(v)) {
+          hi = Math.max(hi, v);
+          lo = Math.min(lo, v);
+        }
+      }
+    }
+
     const range = hi - lo || 1;
     const pad = range * 0.08;
     hi += pad;
@@ -120,6 +153,72 @@ export default function CandleChart({
       ctx.lineTo(plotW, py);
       ctx.stroke();
       ctx.fillText(fmt(price), plotW + 4, py + 4);
+    }
+
+    const drawSeries = (
+      values: number[],
+      color: string,
+      dashed: boolean,
+      yMap: (v: number) => number,
+      startIdx: number,
+    ) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.25;
+      ctx.setLineDash(dashed ? [4, 3] : []);
+      ctx.beginPath();
+      let started = false;
+      for (let vi = 0; vi < visible.length; vi++) {
+        const gi = startIdx + vi;
+        if (gi >= values.length) continue;
+        const v = values[gi];
+        if (Number.isNaN(v)) {
+          started = false;
+          continue;
+        }
+        const x = vi * slot + candleW / 2 + 2;
+        const py = yMap(v);
+        if (!started) {
+          ctx.moveTo(x, py);
+          started = true;
+        } else ctx.lineTo(x, py);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    };
+
+    for (const line of priceLines) {
+      drawSeries(line.values, line.color, !!line.dashed, y, visStart);
+    }
+
+    if (oscH > 0 && oscLines.length > 0) {
+      const oy0 = plotH + 6;
+      ctx.fillStyle = "#111827";
+      ctx.fillRect(0, oy0, plotW, oscH - 6);
+      ctx.strokeStyle = GRID;
+      ctx.beginPath();
+      ctx.moveTo(0, oy0);
+      ctx.lineTo(plotW, oy0);
+      ctx.stroke();
+      for (const line of oscLines) {
+        let oHi = -Infinity;
+        let oLo = Infinity;
+        for (let vi = 0; vi < visible.length; vi++) {
+          const gi = visStart + vi;
+          if (gi >= line.values.length) continue;
+          const v = line.values[gi];
+          if (!Number.isNaN(v)) {
+            oHi = Math.max(oHi, v);
+            oLo = Math.min(oLo, v);
+          }
+        }
+        const oSpan = oHi - oLo || 1;
+        const oy = (v: number) => oy0 + ((oHi - v) / oSpan) * (oscH - 10) + 2;
+        drawSeries(line.values, line.color, true, oy, visStart);
+      }
+      ctx.font = "9px ui-monospace, monospace";
+      ctx.fillStyle = TEXT;
+      ctx.fillText("osc", 4, oy0 + 10);
+      ctx.font = "11px ui-monospace, monospace";
     }
 
     visible.forEach((c, i) => {
@@ -208,19 +307,19 @@ export default function CandleChart({
       if (position.sl) drawLevel(position.sl, "#f87171", "SL");
       if (position.tp) drawLevel(position.tp, "#4ade80", "TP");
     }
-  }, [candles, position, botPositions, height, resizeTick]);
+  }, [candles, position, botPositions, indicators, height, fill, resizeTick]);
 
   return (
     <div
       ref={wrapRef}
-      className="relative w-full select-none"
-      style={enableMouseTrading ? { cursor: "crosshair" } : undefined}
+      className={`relative w-full select-none ${fill ? "h-full min-h-[200px]" : ""}`}
+      style={enableMouseTrading ? { cursor: "crosshair" } : !fill ? { height } : undefined}
       onClick={enableMouseTrading ? () => onBuy?.() : undefined}
       onContextMenu={
         enableMouseTrading
           ? (e) => {
               e.preventDefault();
-              onSell?.();
+              onClose?.();
             }
           : undefined
       }
@@ -229,7 +328,7 @@ export default function CandleChart({
           ? (e) => {
               if (e.button === 1) {
                 e.preventDefault();
-                onClose?.();
+                onSell?.();
               }
             }
           : undefined
@@ -238,8 +337,8 @@ export default function CandleChart({
       <canvas ref={canvasRef} className="block w-full rounded-lg" />
       {enableMouseTrading && (
         <div className="pointer-events-none absolute left-2 top-2 rounded bg-slate-900/70 px-2 py-1 text-[10px] text-slate-400">
-          L-click <span className="text-emerald-400">Buy</span> · R-click <span className="text-rose-400">Sell</span> ·
-          M-click Close
+          L-click <span className="text-emerald-400">Long</span> · R-click Close · M-click{" "}
+          <span className="text-rose-400">Short</span>
         </div>
       )}
     </div>

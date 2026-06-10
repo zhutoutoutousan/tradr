@@ -1,3 +1,4 @@
+import { RNG } from "./rng";
 import type { Candle, IMarket } from "./types";
 
 export interface HistoricalConfig {
@@ -29,18 +30,31 @@ export class HistoricalMarket implements IMarket {
   private price: number;
   private forming: Candle;
 
-  constructor(data: Candle[], label: string, cfg: HistoricalConfig = DEFAULT_HISTORICAL) {
+  // `seed` (when provided) picks a random starting date so each run opens at a
+  // different point in history. Without it (e.g. synced multiplayer replays) the
+  // feed deterministically starts right after the warmup window, as before.
+  constructor(data: Candle[], label: string, cfg: HistoricalConfig = DEFAULT_HISTORICAL, seed?: number) {
     this.data = data;
     this.label = label;
     this.cfg = cfg;
 
     const warmup = Math.max(0, Math.min(cfg.warmup, data.length - 2));
-    this.loopStart = warmup;
-    this.completed = warmup;
-    this.candles = data.slice(0, warmup).map((c, i) => ({ ...c, time: i }));
+
+    // Choose where play begins. We need `warmup` real bars before it (for
+    // indicator history) and a healthy runway of bars after it.
+    let start = warmup;
+    if (seed !== undefined) {
+      const minStart = warmup;
+      const maxStart = Math.max(minStart, data.length - 2);
+      start = minStart + Math.floor(new RNG(seed).next() * Math.max(1, maxStart - minStart));
+    }
+
+    this.loopStart = start;
+    this.completed = warmup; // displayed bar index always starts past the warmup
+    this.candles = data.slice(start - warmup, start).map((c, i) => ({ ...c, time: i }));
     if (this.candles.length > cfg.maxHistory) this.candles = this.candles.slice(-cfg.maxHistory);
 
-    this.cursor = warmup;
+    this.cursor = start;
     const first = data[this.cursor] ?? data[data.length - 1];
     this.price = first.open;
     this.forming = this.newForming(first.open);
@@ -113,6 +127,15 @@ export class HistoricalMarket implements IMarket {
       return true;
     }
     return false;
+  }
+
+  // Direction of the next `bars` of real history relative to the current price.
+  peekDirection(bars = 1): number {
+    const idx = Math.min(this.cursor + Math.max(1, bars) - 1, this.data.length - 1);
+    const target = this.data[idx];
+    if (!target) return 0;
+    const diff = target.close - this.price;
+    return diff > 0 ? 1 : diff < 0 ? -1 : 0;
   }
 
   view(): Candle[] {

@@ -1,4 +1,4 @@
-import { mulberry32, gaussian } from "./rng";
+import { RNG } from "./rng";
 import type { Candle, IMarket } from "./types";
 
 export interface MarketConfig {
@@ -19,15 +19,19 @@ export const DEFAULT_MARKET: MarketConfig = {
   warmupBars: 80,
 };
 
+interface PriceState {
+  price: number;
+  trend: number;
+  vol: number;
+}
+
 // Generates a synthetic price series with trends, consolidations and
 // volatility clustering so the ported strategies have structure to trade.
 export class Market implements IMarket {
   readonly cfg: MarketConfig;
   readonly label = "Random (synthetic)";
-  private rand: () => number;
-  private price: number;
-  private trend = 0;
-  private vol: number;
+  private rng: RNG;
+  private state: PriceState;
   private tickInBar = 0;
   private barIndex = 0;
   private forming: Candle;
@@ -35,9 +39,8 @@ export class Market implements IMarket {
 
   constructor(cfg: MarketConfig = DEFAULT_MARKET) {
     this.cfg = cfg;
-    this.rand = mulberry32(cfg.seed);
-    this.price = cfg.startPrice;
-    this.vol = cfg.baseVol;
+    this.rng = new RNG(cfg.seed);
+    this.state = { price: cfg.startPrice, trend: 0, vol: cfg.baseVol };
     this.forming = this.newCandle(cfg.startPrice);
     for (let i = 0; i < cfg.warmupBars * cfg.ticksPerBar; i++) this.tick();
   }
@@ -51,32 +54,38 @@ export class Market implements IMarket {
   }
 
   get currentPrice(): number {
-    return this.price;
+    return this.state.price;
   }
 
   get bar(): number {
     return this.barIndex;
   }
 
+  // One price step. Mutates `s` and returns the tick return. The exact draw
+  // order from the RNG matters: peekDirection rewinds the RNG afterwards so the
+  // real path remains identical, which only holds if both paths draw the same.
+  private stepPrice(s: PriceState): number {
+    s.trend = s.trend * 0.985 + this.rng.gaussian() * 0.00035;
+    if (this.rng.next() < 0.012) s.trend += (this.rng.next() - 0.5) * 0.0055;
+    s.trend = Math.max(-0.004, Math.min(0.004, s.trend));
+
+    s.vol = s.vol * 0.97 + this.cfg.baseVol * 0.03;
+    if (this.rng.next() < 0.02) s.vol *= 1 + this.rng.next() * 1.5;
+    s.vol = Math.max(this.cfg.baseVol * 0.4, Math.min(this.cfg.baseVol * 5, s.vol));
+
+    const ret = s.trend + s.vol * this.rng.gaussian();
+    s.price = Math.max(1, s.price * (1 + ret));
+    return ret;
+  }
+
   // Advance one tick. Returns true when a new bar has just closed.
   tick(): boolean {
-    // Slowly wandering drift with occasional regime shifts (trends vs ranges).
-    this.trend = this.trend * 0.985 + gaussian(this.rand) * 0.00035;
-    if (this.rand() < 0.012) this.trend += (this.rand() - 0.5) * 0.0055;
-    this.trend = Math.max(-0.004, Math.min(0.004, this.trend));
-
-    // Volatility clustering.
-    this.vol = this.vol * 0.97 + this.cfg.baseVol * 0.03;
-    if (this.rand() < 0.02) this.vol *= 1 + this.rand() * 1.5;
-    this.vol = Math.max(this.cfg.baseVol * 0.4, Math.min(this.cfg.baseVol * 5, this.vol));
-
-    const ret = this.trend + this.vol * gaussian(this.rand);
-    this.price = Math.max(1, this.price * (1 + ret));
+    const ret = this.stepPrice(this.state);
 
     const c = this.forming;
-    c.close = this.price;
-    if (this.price > c.high) c.high = this.price;
-    if (this.price < c.low) c.low = this.price;
+    c.close = this.state.price;
+    if (this.state.price > c.high) c.high = this.state.price;
+    if (this.state.price < c.low) c.low = this.state.price;
     c.volume += 1 + Math.floor(Math.abs(ret) / this.cfg.baseVol);
 
     this.tickInBar++;
@@ -85,10 +94,23 @@ export class Market implements IMarket {
       if (this.candles.length > this.cfg.maxHistory) this.candles.shift();
       this.tickInBar = 0;
       this.barIndex++;
-      this.forming = this.newCandle(this.price);
+      this.forming = this.newCandle(this.state.price);
       return true;
     }
     return false;
+  }
+
+  // Predicts the net direction of the next `bars` bars without disturbing the
+  // live feed: simulates forward on a copy of the price state, then rewinds the
+  // RNG so the real future is unchanged. Returns 1 (up), -1 (down) or 0.
+  peekDirection(bars = 1): number {
+    const saved = this.rng.state;
+    const sim: PriceState = { ...this.state };
+    const ticks = Math.max(1, bars) * this.cfg.ticksPerBar - this.tickInBar;
+    for (let i = 0; i < ticks; i++) this.stepPrice(sim);
+    this.rng.state = saved;
+    const diff = sim.price - this.state.price;
+    return diff > 0 ? 1 : diff < 0 ? -1 : 0;
   }
 
   // Candles including the currently forming one (for live rendering).
@@ -97,7 +119,6 @@ export class Market implements IMarket {
   }
 
   closes(): number[] {
-    const arr = this.candles.map((c) => c.close);
-    return arr;
+    return this.candles.map((c) => c.close);
   }
 }

@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import CandleChart from "@/components/CandleChart";
 import TraderCard from "@/components/TraderCard";
-import { useGame, type GameConfig } from "@/hooks/useGame";
+import PowerupBar from "@/components/PowerupBar";
+import GameOverModal from "@/components/GameOverModal";
+import MenuModal from "@/components/MenuModal";
+import ReviewModal from "@/components/ReviewModal";
+import type { RoundReview } from "@/lib/game/reviews";
+import { useGame, type GameConfig, type RoundResult } from "@/hooks/useGame";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { loadProfile } from "@/lib/game/profile";
+import type { PowerupId } from "@/lib/game/powerups";
+import { instrumentLabel, type RoundSetup } from "@/lib/game/roundSetup";
 
 export interface MarketOption {
   id: string;
@@ -17,34 +24,68 @@ function money(n: number) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
 
-const KIND_LABELS: Record<string, string> = {
-  forex: "Forex",
-  commodity: "Commodities",
-  crypto: "Crypto",
-  stock: "Stocks",
+function clock(ms: number) {
+  const total = Math.ceil(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+const POWERUP_KEYS: Record<string, PowerupId> = {
+  q: "freeze",
+  w: "leverage",
+  e: "tip",
+  r: "slowmo",
+  t: "shield",
 };
 
 export default function GameView({
   config,
+  setup,
   markets,
-  selectedId,
-  onSelect,
+  onReplay,
+  onRoundEnd,
+  onContinue,
+  onOpenTutorial,
 }: {
   config: GameConfig;
+  setup: RoundSetup;
   markets: MarketOption[];
-  selectedId: string;
-  onSelect: (id: string) => void;
+  onReplay: () => void;
+  onRoundEnd?: (result: RoundResult) => void;
+  onContinue?: () => void;
+  onOpenTutorial?: () => void;
 }) {
-  const { snapshot, running, speed, speedIdx, speeds, controls } = useGame(config);
+  const { snapshot, running, speed, speedIdx, speeds, timeLeftMs, gameOver, result, powerups, controls } =
+    useGame(config, markets);
   const isMobile = useIsMobile();
-  const chartHeight = isMobile ? 300 : 440;
+  const chartHeight = 440;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState<RoundReview | null>(null);
+  const [elo, setElo] = useState<number | null>(null);
+
+  useEffect(() => {
+    setElo(loadProfile().elo);
+  }, []);
+  useEffect(() => {
+    if (result) {
+      setElo(result.eloAfter);
+      onRoundEnd?.(result);
+    }
+  }, [result, onRoundEnd]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat) return;
       const target = e.target as HTMLElement;
       if (target && (target.tagName === "INPUT" || target.tagName === "SELECT")) return;
-      switch (e.key.toLowerCase()) {
+      if (menuOpen || gameOver) return;
+      const key = e.key.toLowerCase();
+      if (POWERUP_KEYS[key]) {
+        controls.activatePowerup(POWERUP_KEYS[key]);
+        return;
+      }
+      switch (key) {
         case "b":
           controls.long();
           break;
@@ -58,9 +99,6 @@ export default function GameView({
           e.preventDefault();
           controls.togglePause();
           break;
-        case "f":
-          controls.cycleSpeed();
-          break;
         case "1":
         case "2":
         case "3":
@@ -71,7 +109,7 @@ export default function GameView({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [controls]);
+  }, [controls, menuOpen, gameOver]);
 
   const leaderboard = useMemo(() => {
     if (!snapshot) return [];
@@ -90,11 +128,7 @@ export default function GameView({
       }));
   }, [snapshot]);
 
-  const grouped = useMemo(() => {
-    const g: Record<string, MarketOption[]> = {};
-    for (const m of markets) (g[m.kind] ??= []).push(m);
-    return g;
-  }, [markets]);
+  const roundLabel = instrumentLabel(setup.instrumentId, markets);
 
   if (!snapshot) {
     return <div className="flex h-screen items-center justify-center text-slate-400">Loading market…</div>;
@@ -102,44 +136,50 @@ export default function GameView({
 
   const p = snapshot.player;
   const playerRank = leaderboard.findIndex((t) => t.id === "you") + 1;
+  const lowTime = timeLeftMs <= 30_000;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-slate-900/80 px-4 py-2.5 backdrop-blur">
+    <div
+      className={`w-full bg-slate-950 text-slate-100 ${isMobile ? "flex h-[100dvh] flex-col overflow-hidden" : "min-h-screen"}`}
+    >
+      <header
+        className={`z-10 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-slate-900/80 px-4 py-2.5 backdrop-blur ${
+          isMobile ? "" : "sticky top-0"
+        }`}
+      >
         <div className="flex items-center gap-3">
-          <Link href="/" className="font-bold tracking-tight text-emerald-400">
+          <button onClick={() => setMenuOpen(true)} className="font-bold tracking-tight text-emerald-400 hover:text-emerald-300">
             ◆ Tradr
-          </Link>
-          <select
-            value={selectedId}
-            onChange={(e) => onSelect(e.target.value)}
-            className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm outline-none focus:border-emerald-500"
-          >
-            <option value="synthetic">Random (synthetic)</option>
-            {Object.entries(grouped).map(([kind, opts]) => (
-              <optgroup key={kind} label={KIND_LABELS[kind] ?? kind}>
-                {opts.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+          </button>
+          {elo !== null && (
+            <span className="rounded-full border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs font-mono text-slate-300">
+              ELO {elo}
+            </span>
+          )}
+          <span className="rounded-md border border-slate-700 bg-slate-800 px-2.5 py-1 text-sm font-medium text-slate-200">
+            {roundLabel}
+          </span>
+          <span className="rounded-md border border-slate-700/80 bg-slate-800/80 px-2 py-1 font-mono text-xs text-slate-300">
+            {setup.timeframeLabel}
+          </span>
           <span className="hidden text-xs text-slate-500 sm:inline">
             bar {snapshot.bar}
             {snapshot.date ? ` · ${snapshot.date}` : ""}
           </span>
-          <Link href="/multiplayer" className="hidden text-xs text-emerald-400 hover:underline sm:inline">
-            ⚔ Multiplayer
-          </Link>
         </div>
         <div className="flex items-center gap-2">
+          <span
+            className={`rounded-md px-3 py-1.5 font-mono text-sm font-bold tabular-nums ${
+              lowTime ? "bg-rose-500/20 text-rose-300" : "bg-slate-800 text-slate-200"
+            }`}
+          >
+            ⏱ {clock(timeLeftMs)}
+          </span>
           <button
             onClick={controls.togglePause}
             className="rounded-md bg-slate-800 px-3 py-1.5 text-sm font-medium hover:bg-slate-700"
           >
-            {running ? "❚❚ Pause" : "▶ Resume"}
+            {running ? "❚❚" : "▶"}
           </button>
           <div className="flex items-center overflow-hidden rounded-md border border-slate-700">
             {speeds.map((s, i) => (
@@ -154,18 +194,45 @@ export default function GameView({
               </button>
             ))}
           </div>
-          <span className="hidden text-xs text-slate-500 md:inline">speed {speed}x</span>
+          <button
+            onClick={() => setMenuOpen(true)}
+            title="Menu"
+            className="rounded-md bg-slate-800 px-3 py-1.5 text-sm font-medium hover:bg-slate-700"
+          >
+            ☰
+          </button>
         </div>
       </header>
 
-      <main className="grid gap-4 p-3 pb-28 sm:p-4 lg:grid-cols-[1fr_360px] lg:pb-4">
-        <section className="space-y-4">
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-2 sm:p-3">
+      <main
+        className={
+          isMobile
+            ? "flex min-h-0 w-full flex-1 flex-col gap-3 px-3 pb-[4.75rem] pt-3"
+            : "grid w-full grid-cols-[1fr_360px] gap-4 p-3 sm:p-4"
+        }
+      >
+        <section className={isMobile ? "flex min-h-0 flex-1 flex-col gap-3" : "space-y-4"}>
+          <div
+            className={`rounded-xl border border-slate-800 bg-slate-900/60 p-2 sm:p-3 ${
+              isMobile ? "flex min-h-0 flex-1 flex-col" : ""
+            }`}
+          >
             <div className="mb-2 flex items-center justify-between px-1">
               <div>
                 <div className="text-sm font-semibold">{snapshot.label}</div>
-                <div className="font-mono text-xl tabular-nums sm:text-2xl">
-                  {snapshot.price.toFixed(snapshot.price < 10 ? 4 : 2)}
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xl tabular-nums sm:text-2xl">
+                    {snapshot.price.toFixed(snapshot.price < 10 ? 4 : 2)}
+                  </span>
+                  {snapshot.tip !== 0 && (
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-xs font-bold ${
+                        snapshot.tip > 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
+                      }`}
+                    >
+                      {snapshot.tip > 0 ? "▲ tip" : "▼ tip"}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="text-right">
@@ -177,20 +244,45 @@ export default function GameView({
                 </div>
               </div>
             </div>
-            <CandleChart
-              candles={snapshot.candles}
-              position={p.position}
-              botPositions={botPositions}
-              height={chartHeight}
-              enableMouseTrading={!isMobile}
-              onBuy={controls.long}
-              onSell={controls.short}
-              onClose={controls.close}
-            />
+            <div className="mb-2 flex flex-wrap gap-1.5 px-1">
+              {setup.indicators.map((ind) => (
+                <span
+                  key={ind.label}
+                  className="rounded border border-slate-700/80 px-1.5 py-0.5 font-mono text-[10px]"
+                  style={{ color: ind.color }}
+                >
+                  {ind.label}
+                </span>
+              ))}
+            </div>
+            <div className={isMobile ? "min-h-0 flex-1" : undefined}>
+              <CandleChart
+                candles={snapshot.candles}
+                position={p.position}
+                botPositions={botPositions}
+                indicators={setup.indicators}
+                height={chartHeight}
+                fill={isMobile}
+                enableMouseTrading={!isMobile}
+                onBuy={controls.long}
+                onSell={controls.short}
+                onClose={controls.close}
+              />
+            </div>
+          </div>
+
+          {/* Power-ups */}
+          <div className={`shrink-0 rounded-xl border border-slate-800 bg-slate-900/60 p-3 ${isMobile ? "py-2" : ""}`}>
+            <div className="mb-2 flex items-center justify-between px-1">
+              <span className="text-sm font-semibold text-slate-300">Power-ups</span>
+              {snapshot.shieldArmed && <span className="text-xs text-pink-300">Shield armed</span>}
+            </div>
+            <PowerupBar powerups={powerups} onActivate={controls.activatePowerup} disabled={gameOver} />
           </div>
 
           {/* Desktop controls + stats card */}
-          <div className="hidden rounded-xl border border-slate-800 bg-slate-900/60 p-4 lg:block">
+          {!isMobile && (
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
             <div className="grid grid-cols-3 gap-3">
               <button onClick={controls.long} className="rounded-lg bg-emerald-600 py-3 font-bold hover:bg-emerald-500">
                 Long <span className="opacity-60">(B)</span>
@@ -217,28 +309,32 @@ export default function GameView({
               <Stat label="Trades" value={`${p.trades}`} />
             </div>
           </div>
+          )}
 
           {/* Mobile compact stats strip */}
-          <div className="grid grid-cols-4 gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs lg:hidden">
+          {isMobile && (
+          <div className="grid shrink-0 grid-cols-4 gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-2.5 text-xs">
             <Stat label="Balance" value={money(p.balance)} />
             <Stat
               label="Open P&L"
               value={`${p.unrealized >= 0 ? "+" : ""}${money(p.unrealized)}`}
               tone={p.unrealized >= 0 ? "up" : "down"}
             />
-            <Stat
-              label="Position"
-              value={p.position ? p.position.side.toUpperCase() : "Flat"}
-            />
+            <Stat label="Position" value={p.position ? p.position.side.toUpperCase() : "Flat"} />
             <Stat label="Trades" value={`${p.trades}`} />
           </div>
+          )}
 
-          <p className="hidden text-center text-xs text-slate-500 lg:block">
-            Mouse: left-click chart to buy · right-click to sell · middle-click to close · or{" "}
-            <kbd>B</kbd>/<kbd>S</kbd>/<kbd>C</kbd> · <kbd>Space</kbd> pause · <kbd>F</kbd> speed
+          {!isMobile && (
+          <p className="text-center text-xs text-slate-500">
+            Mouse: left-click long · right-click close (no flip) · middle-click short · or{" "}
+            <kbd>B</kbd>/<kbd>S</kbd>/<kbd>C</kbd> · <kbd>Space</kbd> pause · speed 1–4 ·{" "}
+            <kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd><kbd>T</kbd> power-ups
           </p>
+          )}
         </section>
 
+        {!isMobile && (
         <aside className="space-y-4">
           <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
             <h2 className="mb-2 px-1 text-sm font-semibold text-slate-300">
@@ -252,28 +348,71 @@ export default function GameView({
             </div>
           </div>
           <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-400">
-            <p className="mb-1 font-semibold text-slate-300">The bots</p>
+            <p className="mb-1 font-semibold text-slate-300">The field</p>
             <p>
-              Six bots run strategies ported from the MT5 <code>cluster-latest</code> expert advisor — RSI scalping, EMA
-              slope, trend-riding, MACD, Bollinger reversion and Donchian breakouts — trading the same feed you see. Pick
-              a real market above to replay 5 years of daily history, or stay on the synthetic feed.
+              Every round spawns a fresh set of roguelike bots — RSI scalpers, EMA and MACD trend traders, Bollinger
+              faders and Donchian breakers — with randomly rolled parameters and leverage, matched to your ELO. Beat
+              them in the 3-minute race to climb the ladder.
             </p>
           </div>
         </aside>
+        )}
       </main>
 
       {/* Mobile sticky trade bar */}
-      <div className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-3 gap-2 border-t border-slate-800 bg-slate-900/95 p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
-        <button onClick={controls.long} className="rounded-lg bg-emerald-600 py-3.5 text-base font-bold active:bg-emerald-500">
+      {isMobile && (
+      <div className="fixed inset-x-0 bottom-0 z-20 grid w-full grid-cols-3 gap-2 border-t border-slate-800 bg-slate-900/95 p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] backdrop-blur">
+        <button
+          data-testid="trade-long"
+          onClick={controls.long}
+          className="rounded-lg bg-emerald-600 py-3.5 text-base font-bold active:bg-emerald-500"
+        >
           Long
         </button>
-        <button onClick={controls.close} className="rounded-lg bg-slate-700 py-3.5 text-base font-bold active:bg-slate-600">
+        <button
+          data-testid="trade-close"
+          onClick={controls.close}
+          className="rounded-lg bg-slate-700 py-3.5 text-base font-bold active:bg-slate-600"
+        >
           Close
         </button>
-        <button onClick={controls.short} className="rounded-lg bg-rose-600 py-3.5 text-base font-bold active:bg-rose-500">
+        <button
+          data-testid="trade-short"
+          onClick={controls.short}
+          className="rounded-lg bg-rose-600 py-3.5 text-base font-bold active:bg-rose-500"
+        >
           Short
         </button>
       </div>
+      )}
+
+      {menuOpen && (
+        <MenuModal
+          onClose={() => setMenuOpen(false)}
+          onOpenTutorial={
+            onOpenTutorial
+              ? () => {
+                  setMenuOpen(false);
+                  onOpenTutorial();
+                }
+              : undefined
+          }
+          onOpenReview={(r) => {
+            setMenuOpen(false);
+            setReviewOpen(r);
+          }}
+        />
+      )}
+      {gameOver && result && !reviewOpen && !menuOpen && (
+        <GameOverModal
+          result={result}
+          onReplay={onReplay}
+          onMenu={() => setMenuOpen(true)}
+          onReview={() => setReviewOpen(result.review)}
+          onContinue={onContinue}
+        />
+      )}
+      {reviewOpen && <ReviewModal review={reviewOpen} onClose={() => setReviewOpen(null)} />}
     </div>
   );
 }
