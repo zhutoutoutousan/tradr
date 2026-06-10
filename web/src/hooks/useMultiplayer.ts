@@ -7,6 +7,8 @@ import { Market, DEFAULT_MARKET } from "@/lib/sim/market";
 import { HistoricalMarket } from "@/lib/sim/historical";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
 import type { Candle, Side } from "@/lib/sim/types";
+import type { DanmakuItem } from "@/components/DanmakuOverlay";
+import { buildMultiplayerReview, mpRoundSetup, saveMultiplayerRound } from "@/lib/game/multiplayerRound";
 
 const MS_PER_TICK = 1000 / 9; // must match the synthetic feed's intended speed
 const COUNTDOWN_MS = 4000;
@@ -31,6 +33,16 @@ function colorForId(id: string): number {
 }
 
 export type MpPhase = "disabled" | "connecting" | "lobby" | "countdown" | "running" | "finished";
+export type MpRole = "player" | "spectator";
+export type SaveStatus = "idle" | "saving" | "saved" | "error";
+
+export interface ChatMessage {
+  id: string;
+  userId: string;
+  name: string;
+  text: string;
+  at: number;
+}
 
 export interface InstrumentOption {
   id: string;
@@ -75,10 +87,9 @@ interface PresenceMeta {
   joinedAt: number;
   startEpoch: number | null;
   instrument: string;
-  // Version (timestamp) of the instrument choice. Highest version wins across
-  // the room, so an explicit pick always beats the default and the choice never
-  // depends on fragile clock-based "host" detection.
   instrumentVersion: number;
+  role: MpRole;
+  roundNumber: number;
 }
 
 interface LiveStats {
@@ -91,15 +102,26 @@ interface LiveStats {
 // Build a deterministic engine for the given instrument. Synthetic uses the room
 // seed; real markets replay the exact same candle file on every client, so the
 // race stays perfectly in sync.
-function buildSyntheticEngine(room: string): GameEngine {
-  return new GameEngine(new Market({ ...DEFAULT_MARKET, seed: hashSeed(room) }));
+function roomSeed(room: string, roundNumber: number): number {
+  return hashSeed(roundNumber > 0 ? `${room}:${roundNumber}` : room);
 }
 
-export function useMultiplayer(room: string, name: string) {
+function buildSyntheticEngine(room: string, roundNumber = 0): GameEngine {
+  return new GameEngine(new Market({ ...DEFAULT_MARKET, seed: roomSeed(room, roundNumber) }));
+}
+
+export function useMultiplayer(room: string, name: string, role: MpRole = "player") {
   const engineRef = useRef<GameEngine | null>(null);
+  const roundNumberRef = useRef(0);
+  const roundCandlesRef = useRef<Candle[]>([]);
+  const savedRoundRef = useRef(false);
+  const roleRef = useRef<MpRole>(role);
+
   if (!engineRef.current) {
-    engineRef.current = buildSyntheticEngine(room);
+    engineRef.current = buildSyntheticEngine(room, 0);
+    roundCandlesRef.current = engineRef.current.market.candles.map((c) => ({ ...c }));
   }
+  roleRef.current = role;
 
   const myIdRef = useRef<string>("");
   if (!myIdRef.current) {
@@ -126,6 +148,12 @@ export function useMultiplayer(room: string, name: string) {
   const [instruments, setInstruments] = useState<InstrumentOption[]>([]);
   const [selectedInstrument, setSelectedInstrument] = useState<string>(SYNTHETIC);
   const [instrumentLoading, setInstrumentLoading] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [danmaku, setDanmaku] = useState<DanmakuItem[]>([]);
+  const [spectatorCount, setSpectatorCount] = useState(0);
+  const [traderCount, setTraderCount] = useState(1);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [roundNumber, setRoundNumber] = useState(0);
 
   // Load the catalogue of real markets once.
   useEffect(() => {
@@ -147,6 +175,8 @@ export function useMultiplayer(room: string, name: string) {
         startEpoch: startEpochRef.current,
         instrument: instrumentRef.current,
         instrumentVersion: instrumentVersionRef.current,
+        role: roleRef.current,
+        roundNumber: roundNumberRef.current,
         ...partial,
       };
       ch.track(meta);
@@ -165,7 +195,8 @@ export function useMultiplayer(room: string, name: string) {
       setSelectedInstrument(id);
 
       if (id === SYNTHETIC) {
-        engineRef.current = buildSyntheticEngine(room);
+        engineRef.current = buildSyntheticEngine(room, roundNumberRef.current);
+        roundCandlesRef.current = engineRef.current.market.candles.map((c) => ({ ...c }));
         engineReadyRef.current = true;
         setInstrumentLoading(false);
         return;
@@ -181,16 +212,19 @@ export function useMultiplayer(room: string, name: string) {
         })
         .then((d: { name: string; candles: Candle[] }) => {
           if (instrumentRef.current !== reqId) return; // a newer selection won
-          engineRef.current = new GameEngine(new HistoricalMarket(d.candles, d.name));
+          engineRef.current = new GameEngine(
+            new HistoricalMarket(d.candles, d.name, undefined, roomSeed(room, roundNumberRef.current)),
+          );
+          roundCandlesRef.current = engineRef.current.market.candles.map((c) => ({ ...c }));
           engineReadyRef.current = true;
           setInstrumentLoading(false);
         })
         .catch(() => {
           if (instrumentRef.current !== reqId) return;
-          // Fall back to synthetic so the room never gets stuck.
           instrumentRef.current = SYNTHETIC;
           setSelectedInstrument(SYNTHETIC);
-          engineRef.current = buildSyntheticEngine(room);
+          engineRef.current = buildSyntheticEngine(room, roundNumberRef.current);
+          roundCandlesRef.current = engineRef.current.market.candles.map((c) => ({ ...c }));
           engineReadyRef.current = true;
           setInstrumentLoading(false);
         });
@@ -217,11 +251,47 @@ export function useMultiplayer(room: string, name: string) {
       if (p && p.id) statsRef.current[p.id] = p;
     });
 
-    // Host control signals (instrument choice, race start). Broadcast is
-    // immediate and reliable for one-off events; presence carries the same data
-    // so anyone joining LATER still picks it up from the initial state.
+    ch.on("broadcast", { event: "chat" }, ({ payload }) => {
+      const msg = payload as ChatMessage;
+      if (!msg?.id || !msg.text) return;
+      setChatMessages((prev) => [...prev.slice(-99), msg]);
+      setDanmaku((prev) => [
+        ...prev,
+        {
+          id: msg.id,
+          text: `${msg.name}: ${msg.text}`,
+          top: 8 + Math.random() * 72,
+          color: REMOTE_PALETTE[colorForId(msg.userId)],
+        },
+      ]);
+    });
+
     ch.on("broadcast", { event: "control" }, ({ payload }) => {
-      const p = payload as { instrument?: string; instrumentVersion?: number; startEpoch?: number };
+      const p = payload as {
+        instrument?: string;
+        instrumentVersion?: number;
+        startEpoch?: number | null;
+        rematch?: boolean;
+        roundNumber?: number;
+      };
+      if (p?.rematch) {
+        const rn = p.roundNumber ?? roundNumberRef.current + 1;
+        roundNumberRef.current = rn;
+        setRoundNumber(rn);
+        startEpochRef.current = null;
+        savedRoundRef.current = false;
+        setSaveStatus("idle");
+        roundCandlesRef.current = [];
+        if (instrumentRef.current === SYNTHETIC) {
+          engineRef.current = buildSyntheticEngine(room, rn);
+          roundCandlesRef.current = engineRef.current.market.candles.map((c) => ({ ...c }));
+        } else {
+          applyInstrumentRef.current(instrumentRef.current, instrumentVersionRef.current);
+        }
+        setPhase("lobby");
+        pushPresence({ startEpoch: null, roundNumber: rn });
+        return;
+      }
       if (p?.instrument && (p.instrumentVersion ?? 0) > instrumentVersionRef.current) {
         applyInstrumentRef.current(p.instrument, p.instrumentVersion ?? 0);
       }
@@ -246,7 +316,10 @@ export function useMultiplayer(room: string, name: string) {
       for (const id of Object.keys(statsRef.current)) {
         if (!flat[id]) delete statsRef.current[id];
       }
-      setPlayerCount(Object.keys(flat).length || 1);
+      const ids = Object.keys(flat);
+      setPlayerCount(ids.length || 1);
+      setTraderCount(ids.filter((id) => (flat[id]?.role ?? "player") === "player").length || 1);
+      setSpectatorCount(ids.filter((id) => flat[id]?.role === "spectator").length);
 
       // Host = earliest joiner (ties broken by id) and is the source of truth
       // for the chosen instrument.
@@ -342,7 +415,19 @@ export function useMultiplayer(room: string, name: string) {
             const target = Math.floor((now - start) / MS_PER_TICK);
             let steps = target - e.ticks;
             if (steps > MAX_CATCHUP) steps = MAX_CATCHUP;
-            for (let i = 0; i < steps; i++) e.step();
+            for (let i = 0; i < steps; i++) {
+              const prevBar = e.market.bar;
+              e.step();
+              if (e.market.bar > prevBar) {
+                const closed = e.market.candles[e.market.candles.length - 1];
+                if (closed) {
+                  const last = roundCandlesRef.current[roundCandlesRef.current.length - 1];
+                  if (!last || last.time !== closed.time) {
+                    roundCandlesRef.current.push({ ...closed });
+                  }
+                }
+              }
+            }
           }
         } else {
           setPhase("countdown");
@@ -357,9 +442,7 @@ export function useMultiplayer(room: string, name: string) {
       const pos = e.player.account.position;
       const retMe = ((eqMe - STARTING_BALANCE) / STARTING_BALANCE) * 100;
 
-      // Broadcast my live stats (ephemeral, high-frequency) — keeps the shared
-      // leaderboard fresh WITHOUT churning presence membership.
-      if (channelRef.current && now - lastPushRef.current > 1000 / STATS_HZ) {
+      if (channelRef.current && roleRef.current === "player" && now - lastPushRef.current > 1000 / STATS_HZ) {
         lastPushRef.current = now;
         channelRef.current.send({
           type: "broadcast",
@@ -369,19 +452,22 @@ export function useMultiplayer(room: string, name: string) {
       }
 
       const rows: LeaderRow[] = [];
-      rows.push({
-        id: myIdRef.current,
-        name: `${name} (you)`,
-        color: "#34d399",
-        equity: eqMe,
-        returnPct: retMe,
-        side: pos?.side ?? null,
-        isMe: true,
-        isBot: false,
-      });
+      if (roleRef.current === "player") {
+        rows.push({
+          id: myIdRef.current,
+          name: `${name} (you)`,
+          color: "#34d399",
+          equity: eqMe,
+          returnPct: retMe,
+          side: pos?.side ?? null,
+          isMe: true,
+          isBot: false,
+        });
+      }
       for (const id of Object.keys(presenceRef.current)) {
         if (id === myIdRef.current) continue;
         const m = presenceRef.current[id];
+        if (m.role === "spectator") continue;
         const s = statsRef.current[id];
         rows.push({
           id,
@@ -455,23 +541,129 @@ export function useMultiplayer(room: string, name: string) {
     if (startEpochRef.current != null) return;
     const epoch = Date.now() + COUNTDOWN_MS;
     startEpochRef.current = epoch;
+    savedRoundRef.current = false;
+    setSaveStatus("idle");
+    roundCandlesRef.current = engineRef.current!.market.candles.map((c) => ({ ...c }));
     pushPresence({ startEpoch: epoch });
     channelRef.current?.send({ type: "broadcast", event: "control", payload: { startEpoch: epoch } });
   }, [pushPresence]);
 
+  const rematch = useCallback(() => {
+    const rn = roundNumberRef.current + 1;
+    roundNumberRef.current = rn;
+    setRoundNumber(rn);
+    startEpochRef.current = null;
+    savedRoundRef.current = false;
+    setSaveStatus("idle");
+    roundCandlesRef.current = [];
+    if (instrumentRef.current === SYNTHETIC) {
+      engineRef.current = buildSyntheticEngine(room, rn);
+      roundCandlesRef.current = engineRef.current.market.candles.map((c) => ({ ...c }));
+    } else {
+      applyInstrument(instrumentRef.current, instrumentVersionRef.current);
+    }
+    setPhase("lobby");
+    pushPresence({ startEpoch: null, roundNumber: rn });
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "control",
+      payload: { rematch: true, roundNumber: rn, startEpoch: null },
+    });
+  }, [applyInstrument, pushPresence, room]);
+
+  const sendChat = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || !channelRef.current) return;
+      const msg: ChatMessage = {
+        id: crypto.randomUUID(),
+        userId: myIdRef.current,
+        name,
+        text: trimmed.slice(0, 120),
+        at: Date.now(),
+      };
+      channelRef.current.send({ type: "broadcast", event: "chat", payload: msg });
+      setChatMessages((prev) => [...prev.slice(-99), msg]);
+      setDanmaku((prev) => [
+        ...prev,
+        {
+          id: msg.id,
+          text: `${msg.name}: ${msg.text}`,
+          top: 8 + Math.random() * 72,
+          color: "#34d399",
+        },
+      ]);
+    },
+    [name],
+  );
+
   const finished = phase === "finished";
+
+  useEffect(() => {
+    if (phase !== "finished" || roleRef.current === "spectator" || savedRoundRef.current) return;
+    const e = engineRef.current;
+    if (!e) return;
+    savedRoundRef.current = true;
+    setSaveStatus("saving");
+
+    const price = e.market.currentPrice;
+    const eqMe = equity(e.player, price);
+    const retMe = ((eqMe - STARTING_BALANCE) / STARTING_BALANCE) * 100;
+    const rows: LeaderRow[] = [];
+    rows.push({
+      id: myIdRef.current,
+      name,
+      color: "#34d399",
+      equity: eqMe,
+      returnPct: retMe,
+      side: e.player.account.position?.side ?? null,
+      isMe: true,
+      isBot: false,
+    });
+    for (const b of e.bots) {
+      const eq = equity(b, price);
+      rows.push({
+        id: b.id,
+        name: b.name,
+        color: b.color,
+        equity: eq,
+        returnPct: ((eq - STARTING_BALANCE) / STARTING_BALANCE) * 100,
+        side: b.account.position?.side ?? null,
+        isMe: false,
+        isBot: true,
+      });
+    }
+    rows.sort((a, b) => b.equity - a.equity);
+
+    const review = buildMultiplayerReview(
+      e,
+      roundCandlesRef.current,
+      rows,
+      room,
+      roundNumberRef.current,
+      e.market.label,
+      instrumentRef.current,
+    );
+    const setup = mpRoundSetup(instrumentRef.current);
+    saveMultiplayerRound(review, setup)
+      .then(() => setSaveStatus("saved"))
+      .catch((err) => {
+        console.warn("multiplayer save failed", err);
+        setSaveStatus("error");
+      });
+  }, [phase, name, room]);
 
   const controls = {
     long: () => {
-      if (finished) return;
+      if (finished || roleRef.current === "spectator") return;
       engineRef.current!.playerLong();
     },
     short: () => {
-      if (finished) return;
+      if (finished || roleRef.current === "spectator") return;
       engineRef.current!.playerShort();
     },
     close: () => {
-      if (finished) return;
+      if (finished || roleRef.current === "spectator") return;
       engineRef.current!.playerClose();
     },
   };
@@ -482,13 +674,23 @@ export function useMultiplayer(room: string, name: string) {
     secondsToStart,
     timeLeftMs,
     roundMs: ROUND_MS,
+    roundNumber,
     playerCount,
+    traderCount,
+    spectatorCount,
     isHost,
+    role,
+    isSpectator: role === "spectator",
     start,
+    rematch,
     controls,
     instruments,
     selectedInstrument,
     setInstrument,
     instrumentLoading,
+    chatMessages,
+    danmaku,
+    sendChat,
+    saveStatus,
   };
 }

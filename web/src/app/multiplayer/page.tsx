@@ -8,6 +8,7 @@ import MultiplayerJoin from "@/components/MultiplayerJoin";
 function JoinPage() {
   const params = useSearchParams();
   const room = (params.get("room") ?? "").toUpperCase();
+  const initialSpectate = params.get("spectate") === "1";
 
   return (
     <div>
@@ -16,7 +17,11 @@ function JoinPage() {
           ◆ Tradr
         </Link>
       </div>
-      <MultiplayerJoin initialRoom={room} onBack={() => window.location.assign("/")} />
+      <MultiplayerJoin
+        initialRoom={room}
+        initialSpectate={initialSpectate}
+        onBack={() => window.location.assign("/")}
+      />
     </div>
   );
 }

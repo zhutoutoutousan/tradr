@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import MultiplayerGame from "@/components/MultiplayerGame";
+import type { MpRole } from "@/hooks/useMultiplayer";
 
 function randomRoom() {
   const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -12,18 +13,21 @@ function randomRoom() {
 
 export default function MultiplayerJoin({
   initialRoom = "",
+  initialSpectate = false,
   onBack,
 }: {
   initialRoom?: string;
+  initialSpectate?: boolean;
   onBack?: () => void;
 }) {
   const [joined, setJoined] = useState(false);
   const [name, setName] = useState("");
   const [room, setRoom] = useState(initialRoom.toUpperCase());
+  const [role, setRole] = useState<MpRole>(initialSpectate ? "spectator" : "player");
 
   function join(e?: React.FormEvent) {
     e?.preventDefault();
-    const n = name.trim() || "Trader";
+    const n = name.trim() || (role === "spectator" ? "Observer" : "Trader");
     const r = (room.trim() || randomRoom()).toUpperCase();
     setName(n);
     setRoom(r);
@@ -33,9 +37,10 @@ export default function MultiplayerJoin({
   if (joined) {
     return (
       <MultiplayerGame
-        key={`${room}:${name}`}
+        key={`${room}:${name}:${role}`}
         room={room}
         name={name}
+        role={role}
         onLeave={() => (onBack ? onBack() : setJoined(false))}
       />
     );
@@ -50,7 +55,7 @@ export default function MultiplayerJoin({
           </button>
         )}
         <h1 className="text-2xl font-bold">Multiplayer</h1>
-        <p className="mt-1 text-sm text-slate-400">Race on the same live market. Leave room blank to create one.</p>
+        <p className="mt-1 text-sm text-slate-400">3-minute race on the same live market. Play or watch as observer.</p>
 
         <form onSubmit={join} className="mt-6 space-y-4">
           <div>
@@ -58,10 +63,37 @@ export default function MultiplayerJoin({
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Trader"
+              placeholder={role === "spectator" ? "Observer" : "Trader"}
               maxLength={20}
               className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-base outline-none focus:border-sky-500"
             />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-slate-300">Join as</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setRole("player")}
+                className={`rounded-lg border px-3 py-2.5 text-sm font-semibold ${
+                  role === "player"
+                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-300"
+                    : "border-slate-700 text-slate-400 hover:bg-slate-800"
+                }`}
+              >
+                Trader
+              </button>
+              <button
+                type="button"
+                onClick={() => setRole("spectator")}
+                className={`rounded-lg border px-3 py-2.5 text-sm font-semibold ${
+                  role === "spectator"
+                    ? "border-violet-500 bg-violet-500/10 text-violet-300"
+                    : "border-slate-700 text-slate-400 hover:bg-slate-800"
+                }`}
+              >
+                Observer
+              </button>
+            </div>
           </div>
           <div>
             <label className="mb-1 block text-sm text-slate-300">Room code (optional)</label>
@@ -86,7 +118,7 @@ export default function MultiplayerJoin({
             type="submit"
             className="w-full rounded-lg bg-sky-500 py-3.5 text-base font-bold text-slate-950 hover:bg-sky-400"
           >
-            {room.trim() ? "Join room" : "Create & play"}
+            {role === "spectator" ? "Watch room" : room.trim() ? "Join room" : "Create & play"}
           </button>
         </form>
       </div>

@@ -18,6 +18,27 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
+@keyframes danmaku-scroll {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  95% {
+    opacity: 1;
+  }
+  to {
+    transform: translateX(calc(-100% - 40vw));
+    opacity: 0;
+  }
+}
+
+.danmaku-bullet {
+  animation: danmaku-scroll 9s linear forwards;
+}
+
 kbd {
   border: 1px solid #334155;
   border-radius: 4px;
