@@ -77,17 +77,14 @@ export default function MultiplayerGame({
   const finished = phase === "finished";
   const lowTime = phase === "running" && timeLeftMs <= 30_000;
   const isMobile = useIsMobile();
-  const chartHeight = isMobile ? 300 : 440;
   const [copied, setCopied] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatHidden, setChatHidden] = useState(false);
   const [danmakuOn, setDanmakuOn] = useState(true);
   const [chatMenuOpen, setChatMenuOpen] = useState(false);
   const [unread, setUnread] = useState(0);
-  const [chatPeek, setChatPeek] = useState<{ name: string; text: string } | null>(null);
   const chatMenuRef = useRef<HTMLDivElement>(null);
   const prevMsgLenRef = useRef(0);
-  const peekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const chatVisible = isMobile ? chatOpen : !chatHidden;
 
@@ -104,8 +101,6 @@ export default function MultiplayerGame({
     setChatOpen(true);
     setChatHidden(false);
     setUnread(0);
-    setChatPeek(null);
-    if (peekTimerRef.current) clearTimeout(peekTimerRef.current);
   }
 
   function hideChat() {
@@ -130,13 +125,7 @@ export default function MultiplayerGame({
     if (visible || added <= 0) return;
 
     setUnread((u) => u + added);
-    if (!danmakuOn) {
-      const latest = chatMessages[chatMessages.length - 1];
-      setChatPeek({ name: latest.name, text: latest.text });
-      if (peekTimerRef.current) clearTimeout(peekTimerRef.current);
-      peekTimerRef.current = setTimeout(() => setChatPeek(null), 6000);
-    }
-  }, [chatMessages, chatOpen, chatHidden, isMobile, danmakuOn]);
+  }, [chatMessages, chatOpen, chatHidden, isMobile]);
 
   function copyInvite() {
     const url =
@@ -214,8 +203,8 @@ export default function MultiplayerGame({
   );
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-slate-900/80 px-4 py-2.5 backdrop-blur">
+    <div className="flex h-screen flex-col overflow-hidden bg-slate-950 text-slate-100">
+      <header className="z-10 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-800 bg-slate-900/80 px-3 py-2 backdrop-blur sm:gap-3 sm:px-4 sm:py-2.5">
         <div className="flex items-center gap-3">
           <Link href="/" className="font-bold tracking-tight text-emerald-400">
             ◆ Tradr
@@ -232,10 +221,15 @@ export default function MultiplayerGame({
               round {roundNumber + 1}
             </span>
           )}
-          <span className="text-xs text-slate-500">
+          <span className="hidden text-xs text-slate-500 sm:inline">
             {playerCount} connected · {traderCount} trader{traderCount === 1 ? "" : "s"}
             {spectatorCount > 0 ? ` · ${spectatorCount} watching` : ""}
           </span>
+          {isMobile && myRank > 0 && !isSpectator && (
+            <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+              #{myRank}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {running && (
@@ -253,41 +247,36 @@ export default function MultiplayerGame({
             {phase === "running" && `Live · bar ${snapshot.bar}`}
             {phase === "finished" && "Race over"}
           </span>
-          <div className="relative" ref={chatMenuRef}>
-            <div className="flex items-center overflow-hidden rounded-md bg-slate-800">
-              <button
-                type="button"
-                onClick={toggleChat}
-                className="relative px-2.5 py-1.5 text-sm hover:bg-slate-700"
-                aria-label={chatVisible ? "Hide chat" : "Show chat"}
-              >
-                💬
-                {unread > 0 && !chatVisible && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-500 px-1 text-[10px] font-bold text-white">
-                    {unread > 9 ? "9+" : unread}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setChatMenuOpen((o) => !o)}
-                className="border-l border-slate-700 px-1.5 py-1.5 text-xs text-slate-400 hover:bg-slate-700"
-                aria-label="Chat settings"
-              >
-                ▾
-              </button>
-            </div>
-            {chatMenuOpen && (
-              <div className="absolute right-0 top-full z-30 mt-1 w-52 rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-xl">
+          {!isMobile && (
+            <div className="relative" ref={chatMenuRef}>
+              <div className="flex items-center overflow-hidden rounded-md bg-slate-800">
                 <button
                   type="button"
-                  onClick={() => setDanmakuOn((on) => !on)}
-                  className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm hover:bg-slate-800"
+                  onClick={toggleChat}
+                  className="relative px-2.5 py-1.5 text-sm hover:bg-slate-700"
+                  aria-label={chatVisible ? "Hide chat" : "Show chat"}
                 >
-                  <span className="text-slate-200">Danmaku on chart</span>
-                  <span className={danmakuOn ? "text-emerald-400" : "text-slate-500"}>{danmakuOn ? "On" : "Off"}</span>
+                  Chat
                 </button>
-                {!isMobile && (
+                <button
+                  type="button"
+                  onClick={() => setChatMenuOpen((o) => !o)}
+                  className="border-l border-slate-700 px-1.5 py-1.5 text-xs text-slate-400 hover:bg-slate-700"
+                  aria-label="Chat settings"
+                >
+                  ▾
+                </button>
+              </div>
+              {chatMenuOpen && (
+                <div className="absolute right-0 top-full z-30 mt-1 w-52 rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-xl">
+                  <button
+                    type="button"
+                    onClick={() => setDanmakuOn((on) => !on)}
+                    className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm hover:bg-slate-800"
+                  >
+                    <span className="text-slate-200">Danmaku on chart</span>
+                    <span className={danmakuOn ? "text-emerald-400" : "text-slate-500"}>{danmakuOn ? "On" : "Off"}</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -301,15 +290,10 @@ export default function MultiplayerGame({
                       {chatHidden ? "Hidden" : "Shown"}
                     </span>
                   </button>
-                )}
-                {isMobile && (
-                  <p className="px-2 py-1 text-xs text-slate-500">
-                    Messages fly as danmaku by default. Tap 💬 to open the full chat.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+            </div>
+          )}
           <button onClick={copyInvite} className="rounded-md bg-slate-800 px-3 py-1.5 text-sm hover:bg-slate-700">
             {copied ? "✓ Copied" : "Invite"}
           </button>
@@ -319,20 +303,20 @@ export default function MultiplayerGame({
         </div>
       </header>
 
-      <main className="grid gap-4 p-3 pb-28 sm:p-4 lg:grid-cols-[1fr_340px] lg:pb-4">
-        <section className="space-y-4">
-          <div className="relative rounded-xl border border-slate-800 bg-slate-900/60 p-2 sm:p-3">
-            <div className="mb-2 flex items-center justify-between px-1">
+      <main className="grid min-h-0 flex-1 gap-2 overflow-hidden p-2 sm:gap-3 sm:p-3 lg:grid-cols-[1fr_280px]">
+        <section className="flex min-h-0 flex-col gap-2 overflow-hidden">
+          <div className="relative flex min-h-0 flex-1 flex-col rounded-xl border border-slate-800 bg-slate-900/60 p-2 sm:p-3">
+            <div className="mb-1 flex shrink-0 items-center justify-between px-1">
               <div>
-                <div className="text-sm font-semibold">{snapshot.label}</div>
-                <div className="font-mono text-xl tabular-nums sm:text-2xl">{snapshot.price.toFixed(priceDecimals)}</div>
+                <div className="text-xs font-semibold sm:text-sm">{snapshot.label}</div>
+                <div className="font-mono text-lg tabular-nums sm:text-2xl">{snapshot.price.toFixed(priceDecimals)}</div>
               </div>
               <div className="text-right">
-                <div className="text-xs text-slate-500">{isSpectator ? "Spectating" : "Your equity"}</div>
+                <div className="text-[10px] text-slate-500 sm:text-xs">{isSpectator ? "Spectating" : "Your equity"}</div>
                 {!isSpectator && (
                   <>
-                    <div className="font-mono text-lg tabular-nums sm:text-xl">{money(me.equity)}</div>
-                    <div className={`font-mono text-sm ${me.returnPct >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    <div className="font-mono text-sm tabular-nums sm:text-xl">{money(me.equity)}</div>
+                    <div className={`font-mono text-xs sm:text-sm ${me.returnPct >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                       {me.returnPct >= 0 ? "+" : ""}
                       {me.returnPct.toFixed(2)}%
                     </div>
@@ -340,12 +324,12 @@ export default function MultiplayerGame({
                 )}
               </div>
             </div>
-            <div className="relative">
+            <div className="relative min-h-0 flex-1">
               <CandleChart
                 candles={snapshot.candles}
                 position={!isSpectator && me.position ? { ...me.position, size: 0, openBar: 0 } : null}
                 botPositions={snapshot.botPositions}
-                height={chartHeight}
+                fill
                 enableMouseTrading={!isMobile && canTrade}
                 onBuy={controls.long}
                 onSell={controls.short}
@@ -355,7 +339,7 @@ export default function MultiplayerGame({
             </div>
 
             {phase !== "running" && phase !== "finished" && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 rounded-xl bg-slate-950/80 backdrop-blur-sm">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-y-auto rounded-xl bg-slate-950/80 p-3 backdrop-blur-sm">
                 {phase === "countdown" ? (
                   <div className="text-center">
                     <div className="text-6xl font-extrabold text-emerald-400">{secondsToStart}</div>
@@ -423,36 +407,32 @@ export default function MultiplayerGame({
             )}
           </div>
 
-          {!isMobile && !chatHidden && (
-            <RoomChat messages={chatMessages} onSend={sendChat} onClose={hideChat} />
-          )}
-
           {/* Desktop controls + stats */}
-          <div className="hidden rounded-xl border border-slate-800 bg-slate-900/60 p-4 lg:block">
-            <div className="grid grid-cols-3 gap-3">
+          <div className="hidden shrink-0 rounded-xl border border-slate-800 bg-slate-900/60 p-2.5 lg:block">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={controls.long}
                 disabled={!canTrade}
-                className="rounded-lg bg-emerald-600 py-3 font-bold hover:bg-emerald-500 disabled:opacity-40"
+                className="rounded-lg bg-emerald-600 py-2 text-sm font-bold hover:bg-emerald-500 disabled:opacity-40"
               >
                 Long <span className="opacity-60">(B)</span>
               </button>
               <button
                 onClick={controls.short}
                 disabled={!canTrade}
-                className="rounded-lg bg-rose-600 py-3 font-bold hover:bg-rose-500 disabled:opacity-40"
+                className="rounded-lg bg-rose-600 py-2 text-sm font-bold hover:bg-rose-500 disabled:opacity-40"
               >
                 Short <span className="opacity-60">(S)</span>
               </button>
               <button
                 onClick={controls.close}
                 disabled={!canTrade}
-                className="rounded-lg bg-slate-700 py-3 font-bold hover:bg-slate-600 disabled:opacity-40"
+                className="rounded-lg bg-slate-700 py-2 text-sm font-bold hover:bg-slate-600 disabled:opacity-40"
               >
                 Close <span className="opacity-60">(C)</span>
               </button>
             </div>
-            <div className="mt-4 grid grid-cols-4 gap-4 text-sm">
+            <div className="mt-2 grid grid-cols-4 gap-2 text-xs">
               <Stat label="Balance" value={money(me.balance)} />
               <Stat
                 label="Open P&L"
@@ -466,31 +446,19 @@ export default function MultiplayerGame({
               <Stat label="Trades" value={`${me.trades}`} />
             </div>
           </div>
-
-          {/* Mobile compact stats strip */}
-          <div className="grid grid-cols-4 gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs lg:hidden">
-            <Stat label="Balance" value={money(me.balance)} />
-            <Stat
-              label="Open P&L"
-              value={`${me.unrealized >= 0 ? "+" : ""}${money(me.unrealized)}`}
-              tone={me.unrealized >= 0 ? "up" : "down"}
-            />
-            <Stat label="Position" value={me.position ? me.position.side.toUpperCase() : "Flat"} />
-            <Stat label="Trades" value={`${me.trades}`} />
-          </div>
         </section>
 
-        <aside className="space-y-4">
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
-            <h2 className="mb-2 px-1 text-sm font-semibold text-slate-300">
+        <aside className="hidden min-h-0 flex-col gap-2 overflow-hidden lg:flex">
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-slate-800 bg-slate-900/60 p-2.5">
+            <h2 className="mb-1.5 px-1 text-xs font-semibold text-slate-300">
               Live race
-              {myRank > 0 && <span className="ml-2 font-normal text-slate-500">you are #{myRank} of {humanCount}</span>}
+              {myRank > 0 && <span className="ml-2 font-normal text-slate-500">#{myRank}/{humanCount}</span>}
             </h2>
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               {snapshot.leaderboard.map((r, i) => (
                 <div
                   key={r.id}
-                  className={`flex items-center justify-between gap-2 rounded-md border px-2.5 py-2 ${
+                  className={`flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 ${
                     r.isMe
                       ? "border-emerald-500/60 bg-emerald-500/5"
                       : r.isBot
@@ -524,11 +492,16 @@ export default function MultiplayerGame({
               ))}
             </div>
           </div>
+          {!chatHidden && (
+            <RoomChat
+              messages={chatMessages}
+              onSend={sendChat}
+              onClose={hideChat}
+              variant="sidebar"
+              className="shrink-0"
+            />
+          )}
           <ShareButtons room={room} spectateInvite compact />
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-400">
-            Everyone in this room trades the <span className="text-slate-300">same seeded market</span> in a{" "}
-            <span className="text-slate-300">3-minute wall-clock race</span>. Observers can chat and send danmaku.
-          </div>
         </aside>
       </main>
 
@@ -633,34 +606,37 @@ export default function MultiplayerGame({
         </div>
       )}
 
-      {isMobile && !danmakuOn && chatPeek && !chatOpen && (
-        <button
-          type="button"
-          onClick={openChat}
-          className="fixed inset-x-3 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-[19] flex items-center gap-2 rounded-xl border border-sky-500/40 bg-slate-900/95 px-3 py-2.5 text-left text-sm shadow-lg backdrop-blur active:bg-slate-800"
-        >
-          <span className="shrink-0 font-semibold text-sky-300">{chatPeek.name}</span>
-          <span className="min-w-0 truncate text-slate-200">{chatPeek.text}</span>
-          <span className="ml-auto shrink-0 text-xs text-sky-400">Open</span>
-        </button>
-      )}
-
-      {isMobile && chatOpen && (
+      {isMobile && (
         <>
-          <div className="fixed inset-0 z-30 bg-slate-950/60" onClick={hideChat} aria-hidden />
-          <div className="chat-sheet fixed inset-x-0 bottom-0 z-40 flex max-h-[min(72vh,520px)] flex-col rounded-t-2xl border-t border-slate-700 bg-slate-900 shadow-2xl">
-            <div className="flex justify-center py-2">
-              <div className="h-1 w-10 rounded-full bg-slate-700" />
-            </div>
-            <RoomChat
-              messages={chatMessages}
-              onSend={sendChat}
-              onClose={hideChat}
-              variant="sheet"
-              className="min-h-0 flex-1 rounded-none border-0 border-t border-slate-800"
-            />
-            <div className="h-[env(safe-area-inset-bottom)]" />
-          </div>
+          <button
+            type="button"
+            onClick={toggleChat}
+            className="fixed right-0 top-[42%] z-30 flex h-11 w-9 -translate-y-1/2 flex-col items-center justify-center rounded-l-lg border border-r-0 border-slate-700 bg-slate-900/95 text-sm shadow-lg backdrop-blur active:bg-slate-800"
+            aria-label={chatOpen ? "Close chat" : "Open chat"}
+          >
+            <span>💬</span>
+            {unread > 0 && !chatOpen && (
+              <span className="absolute -left-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-500 px-1 text-[9px] font-bold text-white">
+                {unread > 9 ? "9+" : unread}
+              </span>
+            )}
+          </button>
+          {chatOpen && (
+            <>
+              <div className="fixed inset-0 z-30 bg-transparent" onClick={hideChat} aria-hidden />
+              <div className="chat-sheet-right fixed right-0 top-12 z-40 flex w-[min(16rem,72vw)] flex-col justify-end border-l border-slate-700 bg-slate-900/98 p-3 shadow-2xl backdrop-blur bottom-[calc(3.75rem+env(safe-area-inset-bottom))]">
+                <RoomChat
+                  messages={chatMessages}
+                  onSend={(text) => {
+                    sendChat(text);
+                    hideChat();
+                  }}
+                  onClose={hideChat}
+                  variant="input"
+                />
+              </div>
+            </>
+          )}
         </>
       )}
 
