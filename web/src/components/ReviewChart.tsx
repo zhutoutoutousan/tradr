@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Candle } from "@/lib/sim/types";
 import type { DealTrade } from "@/lib/game/reviews";
 
@@ -28,12 +28,96 @@ export default function ReviewChart({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [resizeTick, setResizeTick] = useState(0);
+  const [viewStart, setViewStart] = useState(0);
+  const dragRef = useRef<{ x: number; start: number } | null>(null);
+
+  const candleW = 7;
+  const gap = 2;
+  const slot = candleW + gap;
+
+  const maxVisible = (plotW: number) => Math.max(10, Math.floor(plotW / slot));
+  const maxStart = (plotW: number) => Math.max(0, candles.length - maxVisible(plotW));
+
+  const clampStart = useCallback(
+    (start: number, plotW: number) => Math.max(0, Math.min(maxStart(plotW), Math.round(start))),
+    [candles.length],
+  );
 
   useEffect(() => {
     const on = () => setResizeTick((t) => t + 1);
     window.addEventListener("resize", on);
     return () => window.removeEventListener("resize", on);
   }, []);
+
+  useEffect(() => {
+    const plotW = (wrapRef.current?.clientWidth ?? 800) - 60;
+    setViewStart((s) => clampStart(Math.max(s, maxStart(plotW)), plotW));
+  }, [candles.length, resizeTick, clampStart]);
+
+  useEffect(() => {
+    if (focusIdx == null) return;
+    const trade = trades[focusIdx];
+    const wrap = wrapRef.current;
+    if (!trade || !wrap) return;
+
+    const plotW = wrap.clientWidth - 60;
+    const visibleCount = maxVisible(plotW);
+    const i1 = barIndex(candles, trade.openBar);
+    const i2 = barIndex(candles, trade.closeBar);
+    if (i1 < 0 && i2 < 0) return;
+
+    const lo = Math.min(i1 < 0 ? i2 : i1, i2 < 0 ? i1 : i2);
+    const hi = Math.max(i1, i2);
+    const pad = Math.floor(visibleCount * 0.15);
+    const target = clampStart(lo - pad, plotW);
+    const end = hi + pad;
+    const start =
+      end - target > visibleCount
+        ? clampStart(end - visibleCount + 1, plotW)
+        : target;
+    setViewStart(start);
+  }, [focusIdx, trades, candles, clampStart]);
+
+  const panByBars = useCallback(
+    (deltaBars: number) => {
+      const plotW = (wrapRef.current?.clientWidth ?? 800) - 60;
+      setViewStart((s) => clampStart(s + deltaBars, plotW));
+    },
+    [clampStart],
+  );
+
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      panByBars(delta > 0 ? 2 : -2);
+    };
+
+    wrap.addEventListener("wheel", onWheel, { passive: false });
+    return () => wrap.removeEventListener("wheel", onWheel);
+  }, [panByBars]);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    dragRef.current = { x: e.clientX, start: viewStart };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const plotW = (wrapRef.current?.clientWidth ?? 800) - 60;
+    const deltaBars = Math.round((drag.x - e.clientX) / slot);
+    setViewStart(clampStart(drag.start + deltaBars, plotW));
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    dragRef.current = null;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -62,10 +146,9 @@ export default function ReviewChart({
     const plotW = W - padR;
     const plotH = H - padB;
 
-    const gap = 1;
-    const candleW = Math.max(2, Math.min(7, Math.floor(plotW / candles.length) - gap));
-    const slot = candleW + gap;
-    const visible = candles;
+    const visibleCount = maxVisible(plotW);
+    const start = clampStart(viewStart, plotW);
+    const visible = candles.slice(start, start + visibleCount);
 
     let hi = -Infinity;
     let lo = Infinity;
@@ -74,8 +157,12 @@ export default function ReviewChart({
       if (c.low < lo) lo = c.low;
     }
     for (const t of trades) {
-      hi = Math.max(hi, t.entry, t.exit);
-      lo = Math.min(lo, t.entry, t.exit);
+      const i1 = barIndex(candles, t.openBar);
+      const i2 = barIndex(candles, t.closeBar);
+      if ((i1 >= start && i1 < start + visibleCount) || (i2 >= start && i2 < start + visibleCount)) {
+        hi = Math.max(hi, t.entry, t.exit);
+        lo = Math.min(lo, t.entry, t.exit);
+      }
     }
     const range = hi - lo || 1;
     const pad = range * 0.08;
@@ -85,8 +172,9 @@ export default function ReviewChart({
     const y = (price: number) => ((hi - price) / span) * plotH;
     const xForBar = (bar: number) => {
       const i = barIndex(candles, bar);
-      if (i < 0) return null;
-      return i * slot + candleW / 2 + 2;
+      if (i < start || i >= start + visibleCount) return null;
+      const vi = i - start;
+      return vi * slot + candleW / 2 + 2;
     };
     const fmt = (p: number) => (p < 10 ? p.toFixed(4) : p.toFixed(2));
 
@@ -105,8 +193,8 @@ export default function ReviewChart({
       ctx.fillText(fmt(price), plotW + 4, py + 4);
     }
 
-    visible.forEach((c, i) => {
-      const x = i * slot + candleW / 2 + 2;
+    visible.forEach((c, vi) => {
+      const x = vi * slot + candleW / 2 + 2;
       const up = c.close >= c.open;
       ctx.strokeStyle = up ? UP : DOWN;
       ctx.fillStyle = up ? UP : DOWN;
@@ -171,11 +259,23 @@ export default function ReviewChart({
 
     ctx.font = "10px ui-monospace, monospace";
     ctx.fillStyle = TEXT;
-    ctx.fillText(`${candles.length} bars · ${trades.length} deals`, 6, plotH - 4);
-  }, [candles, trades, focusIdx, height, resizeTick]);
+    const rangeEnd = Math.min(candles.length, start + visible.length);
+    ctx.fillText(
+      `bars ${start + 1}–${rangeEnd} of ${candles.length} · ${trades.length} deals · drag or scroll to pan`,
+      6,
+      plotH - 4,
+    );
+  }, [candles, trades, focusIdx, height, resizeTick, viewStart, clampStart]);
 
   return (
-    <div ref={wrapRef} className="relative w-full select-none">
+    <div
+      ref={wrapRef}
+      className="relative w-full cursor-grab select-none active:cursor-grabbing touch-none"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
       <canvas ref={canvasRef} className="block w-full rounded-lg" />
     </div>
   );

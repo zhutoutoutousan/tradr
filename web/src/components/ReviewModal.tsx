@@ -22,7 +22,17 @@ export default function ReviewModal({ review, onClose }: { review: RoundReview; 
   const [gateOpen, setGateOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
-  const s = review.summary;
+  const s = review.summary ?? {
+    rank: 0,
+    returnPct: 0,
+    profit: 0,
+    trades: 0,
+    wins: 0,
+    totalPlayers: 0,
+    eloDelta: 0,
+  };
+  const trades = review.trades ?? [];
+  const candles = review.candles ?? [];
 
   useEffect(() => {
     setSaved(isReviewSaved(review.id));
@@ -84,18 +94,18 @@ export default function ReviewModal({ review, onClose }: { review: RoundReview; 
 
         <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 lg:grid-cols-[1fr_300px]">
           <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-2">
-            <ReviewChart candles={review.candles} trades={review.trades} focusIdx={focusIdx} height={380} />
+            <ReviewChart candles={candles} trades={trades} focusIdx={focusIdx} height={380} />
             <p className="mt-2 px-1 text-xs text-slate-500">
-              Entry/exit arrows on chart. Green/red line = win/loss. Click a deal to focus.
+              Drag or scroll to pan the chart. Entry/exit arrows show each deal; green/red line = win/loss. Click a deal to focus.
             </p>
           </div>
 
           <div className="flex min-h-0 flex-col rounded-xl border border-slate-800 bg-slate-950/40">
             <div className="border-b border-slate-800 px-3 py-2 text-sm font-semibold text-slate-300">
-              Deal list ({review.trades.length})
+              Deal list ({trades.length})
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
-              {review.trades.length === 0 ? (
+              {trades.length === 0 ? (
                 <p className="p-4 text-sm text-slate-500">No closed trades this round.</p>
               ) : (
                 <table className="w-full text-left text-xs">
@@ -109,7 +119,7 @@ export default function ReviewModal({ review, onClose }: { review: RoundReview; 
                     </tr>
                   </thead>
                   <tbody>
-                    {review.trades.map((t, i) => {
+                    {trades.map((t, i) => {
                       const focused = focusIdx === i;
                       return (
                         <tr
