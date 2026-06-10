@@ -10,6 +10,7 @@ import type { Candle, Side } from "@/lib/sim/types";
 
 const MS_PER_TICK = 1000 / 9; // must match the synthetic feed's intended speed
 const COUNTDOWN_MS = 4000;
+const ROUND_MS = 180_000; // 3-minute race, wall-clock synced from startEpoch
 const MAX_CATCHUP = 600;
 const STATS_HZ = 3;
 const SYNTHETIC = "synthetic";
@@ -29,7 +30,7 @@ function colorForId(id: string): number {
   return hashSeed(id) % REMOTE_PALETTE.length;
 }
 
-export type MpPhase = "disabled" | "connecting" | "lobby" | "countdown" | "running";
+export type MpPhase = "disabled" | "connecting" | "lobby" | "countdown" | "running" | "finished";
 
 export interface InstrumentOption {
   id: string;
@@ -119,6 +120,7 @@ export function useMultiplayer(room: string, name: string) {
   const [phase, setPhase] = useState<MpPhase>(supabaseEnabled ? "connecting" : "disabled");
   const [snapshot, setSnapshot] = useState<MpSnapshot | null>(null);
   const [secondsToStart, setSecondsToStart] = useState(0);
+  const [timeLeftMs, setTimeLeftMs] = useState(ROUND_MS);
   const [playerCount, setPlayerCount] = useState(1);
   const [isHost, setIsHost] = useState(false);
   const [instruments, setInstruments] = useState<InstrumentOption[]>([]);
@@ -328,15 +330,24 @@ export function useMultiplayer(room: string, name: string) {
 
       if (start != null) {
         if (now >= start) {
-          setPhase((p) => (p === "running" ? p : "running"));
+          const end = start + ROUND_MS;
+          const left = Math.max(0, end - now);
+          setTimeLeftMs(left);
           setSecondsToStart(0);
-          const target = Math.floor((now - start) / MS_PER_TICK);
-          let steps = target - e.ticks;
-          if (steps > MAX_CATCHUP) steps = MAX_CATCHUP;
-          for (let i = 0; i < steps; i++) e.step();
+
+          if (now >= end) {
+            setPhase((p) => (p === "finished" ? p : "finished"));
+          } else {
+            setPhase((p) => (p === "finished" ? p : "running"));
+            const target = Math.floor((now - start) / MS_PER_TICK);
+            let steps = target - e.ticks;
+            if (steps > MAX_CATCHUP) steps = MAX_CATCHUP;
+            for (let i = 0; i < steps; i++) e.step();
+          }
         } else {
           setPhase("countdown");
           setSecondsToStart(Math.ceil((start - now) / 1000));
+          setTimeLeftMs(ROUND_MS);
         }
       }
 
@@ -448,16 +459,29 @@ export function useMultiplayer(room: string, name: string) {
     channelRef.current?.send({ type: "broadcast", event: "control", payload: { startEpoch: epoch } });
   }, [pushPresence]);
 
+  const finished = phase === "finished";
+
   const controls = {
-    long: () => engineRef.current!.playerLong(),
-    short: () => engineRef.current!.playerShort(),
-    close: () => engineRef.current!.playerClose(),
+    long: () => {
+      if (finished) return;
+      engineRef.current!.playerLong();
+    },
+    short: () => {
+      if (finished) return;
+      engineRef.current!.playerShort();
+    },
+    close: () => {
+      if (finished) return;
+      engineRef.current!.playerClose();
+    },
   };
 
   return {
     phase,
     snapshot,
     secondsToStart,
+    timeLeftMs,
+    roundMs: ROUND_MS,
     playerCount,
     isHost,
     start,

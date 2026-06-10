@@ -80,14 +80,37 @@ export async function saveAnonymousGame(
   if (!res.ok) throw new Error("save failed");
 }
 
+export function mapCommunityGameRow(row: CommunityGameRow, deviceId: string): CommunityGame {
+  return {
+    ...row,
+    review: normalizeCommunityReview(row),
+    isMine: row.deviceId === deviceId,
+  };
+}
+
 export async function fetchCommunityGames(limit = 24): Promise<CommunityGame[]> {
   const deviceId = getDeviceId();
   const res = await fetch(`/api/games?limit=${limit}`, { cache: "no-store" });
   if (!res.ok) return [];
   const data = (await res.json()) as { games?: CommunityGameRow[] };
-  return (data.games ?? []).map((g) => ({
-    ...g,
-    review: normalizeCommunityReview(g),
-    isMine: g.deviceId === deviceId,
-  }));
+  return (data.games ?? []).map((g) => mapCommunityGameRow(g, deviceId));
+}
+
+export async function fetchCommunityGame(id: string): Promise<CommunityGame | null> {
+  const deviceId = getDeviceId();
+  const res = await fetch(`/api/games/${encodeURIComponent(id)}`, { cache: "no-store" });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { game?: CommunityGameRow };
+  if (!data.game) return null;
+  return mapCommunityGameRow(data.game, deviceId);
+}
+
+export function formatTimeAgo(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(ms / 60_000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
 }

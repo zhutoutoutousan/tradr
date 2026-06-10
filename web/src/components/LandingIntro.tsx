@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { RoundResult } from "@/hooks/useGame";
 
 const ORDINAL = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
@@ -26,7 +27,13 @@ export default function LandingIntro({
       <header className="border-b border-slate-800 bg-slate-900/80 px-4 py-4 backdrop-blur">
         <div className="mx-auto flex max-w-4xl items-center justify-between">
           <span className="text-lg font-bold tracking-tight text-emerald-400">◆ Tradr</span>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/community"
+              className="rounded-lg border border-sky-500/50 px-3 py-1.5 text-sm font-semibold text-sky-300 hover:bg-sky-500/10"
+            >
+              Community gallery
+            </Link>
             {onTutorial && (
               <button
                 data-testid="landing-tutorial"

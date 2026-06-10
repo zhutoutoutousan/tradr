@@ -15,6 +15,15 @@ function pct(n: number) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function clock(ms: number) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${r.toString().padStart(2, "0")}`;
+}
+
+const ORDINAL = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
+
 const KIND_LABELS: Record<string, string> = {
   forex: "Forex",
   commodity: "Commodities",
@@ -38,6 +47,7 @@ export default function MultiplayerGame({
     phase,
     snapshot,
     secondsToStart,
+    timeLeftMs,
     playerCount,
     isHost,
     start,
@@ -49,6 +59,8 @@ export default function MultiplayerGame({
   } = useMultiplayer(room, name);
 
   const running = phase === "running";
+  const finished = phase === "finished";
+  const lowTime = running && timeLeftMs <= 30_000;
   const isMobile = useIsMobile();
   const chartHeight = isMobile ? 300 : 440;
   const [copied, setCopied] = useState(false);
@@ -101,7 +113,9 @@ export default function MultiplayerGame({
   const me = snapshot.me;
   const humans = snapshot.leaderboard.filter((r) => !r.isBot);
   const myRank = humans.findIndex((r) => r.isMe) + 1;
+  const overallRank = snapshot.leaderboard.findIndex((r) => r.isMe) + 1;
   const humanCount = humans.length;
+  const totalRacers = snapshot.leaderboard.length;
   const priceDecimals = snapshot.price < 10 ? 4 : 2;
 
   const grouped: Record<string, typeof instruments> = {};
@@ -142,10 +156,20 @@ export default function MultiplayerGame({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {running && (
+            <span
+              className={`rounded-md px-2.5 py-1 font-mono text-xs font-bold tabular-nums ${
+                lowTime ? "bg-rose-500/20 text-rose-300" : "bg-slate-800 text-slate-200"
+              }`}
+            >
+              ⏱ {clock(timeLeftMs)}
+            </span>
+          )}
           <span className="text-xs text-slate-400">
-            {phase === "lobby" && "Lobby"}
+            {phase === "lobby" && "Lobby · 3 min race"}
             {phase === "countdown" && `Starting in ${secondsToStart}…`}
             {phase === "running" && `Live · bar ${snapshot.bar}`}
+            {phase === "finished" && "Race over"}
           </span>
           <button onClick={copyInvite} className="rounded-md bg-slate-800 px-3 py-1.5 text-sm hover:bg-slate-700">
             {copied ? "✓ Copied" : "Invite"}
@@ -184,7 +208,7 @@ export default function MultiplayerGame({
               onClose={controls.close}
             />
 
-            {phase !== "running" && (
+            {phase !== "running" && phase !== "finished" && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 rounded-xl bg-slate-950/80 backdrop-blur-sm">
                 {phase === "countdown" ? (
                   <div className="text-center">
@@ -242,7 +266,7 @@ export default function MultiplayerGame({
                         disabled={instrumentLoading}
                         className="mt-4 rounded-lg bg-emerald-500 px-6 py-3 font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-50"
                       >
-                        ▶ Start race
+                        ▶ Start 3-minute race
                       </button>
                     ) : (
                       <div className="mt-4 text-sm text-slate-500">Waiting for the host to start…</div>
@@ -351,11 +375,84 @@ export default function MultiplayerGame({
             </div>
           </div>
           <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-400">
-            Everyone in this room trades the <span className="text-slate-300">same seeded market</span>, synchronized by
-            clock — so it&apos;s a fair race between all human traders and the bots.
+            Everyone in this room trades the <span className="text-slate-300">same seeded market</span> in a{" "}
+            <span className="text-slate-300">3-minute wall-clock race</span> — synchronized so it&apos;s fair between
+            human traders and bots.
           </div>
         </aside>
       </main>
+
+      {finished && (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm" data-testid="mp-game-over">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+            <div className="text-center">
+              <p className="text-xs font-medium uppercase tracking-widest text-slate-500">3-minute race over</p>
+              <h2 className="mt-1 text-3xl font-extrabold text-slate-100">
+                {overallRank === 1 ? "You won the race!" : `You finished ${ORDINAL[overallRank] ?? `#${overallRank}`}`}
+              </h2>
+              <p className="mt-1 text-sm text-slate-400">
+                {ORDINAL[overallRank] ?? `#${overallRank}`} of {totalRacers} · #{myRank} among traders
+              </p>
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+              <Stat
+                label="Return"
+                value={`${me.returnPct >= 0 ? "+" : ""}${me.returnPct.toFixed(1)}%`}
+                tone={me.returnPct >= 0 ? "up" : "down"}
+              />
+              <Stat
+                label="Equity"
+                value={money(me.equity)}
+                tone={me.returnPct >= 0 ? "up" : "down"}
+              />
+              <Stat label="Trades" value={`${me.trades}`} />
+            </div>
+
+            <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/40 p-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Final standings</p>
+              <div className="space-y-1">
+                {snapshot.leaderboard.map((r, i) => (
+                  <div
+                    key={r.id}
+                    className={`flex items-center justify-between rounded px-2 py-1 text-sm ${
+                      r.isMe ? "bg-emerald-500/10" : ""
+                    }`}
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="w-4 font-mono text-xs text-slate-500">{i + 1}</span>
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: r.color }} />
+                      <span className={`truncate ${r.isMe ? "font-bold text-emerald-300" : "text-slate-300"}`}>
+                        {r.name}
+                      </span>
+                      {r.isBot && <span className="text-[10px] uppercase text-slate-600">bot</span>}
+                    </div>
+                    <span className={`font-mono tabular-nums ${r.returnPct >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                      {r.returnPct >= 0 ? "+" : ""}
+                      {r.returnPct.toFixed(1)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                onClick={onLeave}
+                className="flex-1 rounded-lg border border-slate-700 py-3 font-semibold text-slate-200 hover:bg-slate-800"
+              >
+                Leave room
+              </button>
+              <Link
+                href="/community"
+                className="flex-1 rounded-lg border border-sky-500/60 bg-sky-500/10 py-3 text-center font-semibold text-sky-300 hover:bg-sky-500/20"
+              >
+                Community gallery
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile sticky trade bar */}
       <div className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-3 gap-2 border-t border-slate-800 bg-slate-900/95 p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
