@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import CandleChart from "@/components/CandleChart";
-import { useMultiplayer } from "@/hooks/useMultiplayer";
+import DanmakuOverlay from "@/components/DanmakuOverlay";
+import RoomChat from "@/components/RoomChat";
+import ShareButtons from "@/components/ShareButtons";
+import { useMultiplayer, type MpRole } from "@/hooks/useMultiplayer";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
 function money(n: number) {
@@ -37,10 +40,12 @@ const BUILD_TAG = "v7";
 export default function MultiplayerGame({
   room,
   name,
+  role = "player",
   onLeave,
 }: {
   room: string;
   name: string;
+  role?: MpRole;
   onLeave: () => void;
 }) {
   const {
@@ -48,19 +53,29 @@ export default function MultiplayerGame({
     snapshot,
     secondsToStart,
     timeLeftMs,
+    roundNumber,
     playerCount,
+    traderCount,
+    spectatorCount,
     isHost,
+    isSpectator,
     start,
+    rematch,
     controls,
     instruments,
     selectedInstrument,
     setInstrument,
     instrumentLoading,
-  } = useMultiplayer(room, name);
+    chatMessages,
+    danmaku,
+    sendChat,
+    saveStatus,
+  } = useMultiplayer(room, name, role);
 
-  const running = phase === "running";
+  const running = phase === "running" && !isSpectator;
+  const canTrade = phase === "running" && !isSpectator;
   const finished = phase === "finished";
-  const lowTime = running && timeLeftMs <= 30_000;
+  const lowTime = phase === "running" && timeLeftMs <= 30_000;
   const isMobile = useIsMobile();
   const chartHeight = isMobile ? 300 : 440;
   const [copied, setCopied] = useState(false);
@@ -151,8 +166,17 @@ export default function MultiplayerGame({
           <span className="rounded bg-slate-800/60 px-1.5 py-0.5 font-mono text-[10px] text-slate-500" title="build version">
             {BUILD_TAG}
           </span>
+          {isSpectator && (
+            <span className="rounded bg-violet-500/20 px-2 py-0.5 text-xs font-semibold text-violet-300">Observer</span>
+          )}
+          {roundNumber > 0 && (
+            <span className="rounded bg-slate-800/60 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">
+              round {roundNumber + 1}
+            </span>
+          )}
           <span className="text-xs text-slate-500">
-            {playerCount} connected · {humanCount} trader{humanCount === 1 ? "" : "s"} in race
+            {playerCount} connected · {traderCount} trader{traderCount === 1 ? "" : "s"}
+            {spectatorCount > 0 ? ` · ${spectatorCount} watching` : ""}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -189,24 +213,31 @@ export default function MultiplayerGame({
                 <div className="font-mono text-xl tabular-nums sm:text-2xl">{snapshot.price.toFixed(priceDecimals)}</div>
               </div>
               <div className="text-right">
-                <div className="text-xs text-slate-500">Your equity</div>
-                <div className="font-mono text-lg tabular-nums sm:text-xl">{money(me.equity)}</div>
-                <div className={`font-mono text-sm ${me.returnPct >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                  {me.returnPct >= 0 ? "+" : ""}
-                  {me.returnPct.toFixed(2)}%
-                </div>
+                <div className="text-xs text-slate-500">{isSpectator ? "Spectating" : "Your equity"}</div>
+                {!isSpectator && (
+                  <>
+                    <div className="font-mono text-lg tabular-nums sm:text-xl">{money(me.equity)}</div>
+                    <div className={`font-mono text-sm ${me.returnPct >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                      {me.returnPct >= 0 ? "+" : ""}
+                      {me.returnPct.toFixed(2)}%
+                    </div>
+                  </>
+                )}
               </div>
             </div>
-            <CandleChart
-              candles={snapshot.candles}
-              position={me.position ? { ...me.position, size: 0, openBar: 0 } : null}
-              botPositions={snapshot.botPositions}
-              height={chartHeight}
-              enableMouseTrading={!isMobile && running}
-              onBuy={controls.long}
-              onSell={controls.short}
-              onClose={controls.close}
-            />
+            <div className="relative">
+              <CandleChart
+                candles={snapshot.candles}
+                position={!isSpectator && me.position ? { ...me.position, size: 0, openBar: 0 } : null}
+                botPositions={snapshot.botPositions}
+                height={chartHeight}
+                enableMouseTrading={!isMobile && canTrade}
+                onBuy={controls.long}
+                onSell={controls.short}
+                onClose={controls.close}
+              />
+              <DanmakuOverlay items={danmaku} />
+            </div>
 
             {phase !== "running" && phase !== "finished" && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 rounded-xl bg-slate-950/80 backdrop-blur-sm">
@@ -277,26 +308,28 @@ export default function MultiplayerGame({
             )}
           </div>
 
+          <RoomChat messages={chatMessages} onSend={sendChat} />
+
           {/* Desktop controls + stats */}
           <div className="hidden rounded-xl border border-slate-800 bg-slate-900/60 p-4 lg:block">
             <div className="grid grid-cols-3 gap-3">
               <button
                 onClick={controls.long}
-                disabled={!running}
+                disabled={!canTrade}
                 className="rounded-lg bg-emerald-600 py-3 font-bold hover:bg-emerald-500 disabled:opacity-40"
               >
                 Long <span className="opacity-60">(B)</span>
               </button>
               <button
                 onClick={controls.short}
-                disabled={!running}
+                disabled={!canTrade}
                 className="rounded-lg bg-rose-600 py-3 font-bold hover:bg-rose-500 disabled:opacity-40"
               >
                 Short <span className="opacity-60">(S)</span>
               </button>
               <button
                 onClick={controls.close}
-                disabled={!running}
+                disabled={!canTrade}
                 className="rounded-lg bg-slate-700 py-3 font-bold hover:bg-slate-600 disabled:opacity-40"
               >
                 Close <span className="opacity-60">(C)</span>
@@ -374,10 +407,10 @@ export default function MultiplayerGame({
               ))}
             </div>
           </div>
+          <ShareButtons room={room} spectateInvite compact />
           <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-400">
             Everyone in this room trades the <span className="text-slate-300">same seeded market</span> in a{" "}
-            <span className="text-slate-300">3-minute wall-clock race</span> — synchronized so it&apos;s fair between
-            human traders and bots.
+            <span className="text-slate-300">3-minute wall-clock race</span>. Observers can chat and send danmaku.
           </div>
         </aside>
       </main>
@@ -387,27 +420,34 @@ export default function MultiplayerGame({
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
             <div className="text-center">
               <p className="text-xs font-medium uppercase tracking-widest text-slate-500">3-minute race over</p>
-              <h2 className="mt-1 text-3xl font-extrabold text-slate-100">
-                {overallRank === 1 ? "You won the race!" : `You finished ${ORDINAL[overallRank] ?? `#${overallRank}`}`}
-              </h2>
-              <p className="mt-1 text-sm text-slate-400">
-                {ORDINAL[overallRank] ?? `#${overallRank}`} of {totalRacers} · #{myRank} among traders
-              </p>
+              {isSpectator ? (
+                <>
+                  <h2 className="mt-1 text-3xl font-extrabold text-slate-100">Race finished</h2>
+                  <p className="mt-1 text-sm text-slate-400">Thanks for watching — host can start another round.</p>
+                </>
+              ) : (
+                <>
+                  <h2 className="mt-1 text-3xl font-extrabold text-slate-100">
+                    {overallRank === 1 ? "You won the race!" : `You finished ${ORDINAL[overallRank] ?? `#${overallRank}`}`}
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-400">
+                    {ORDINAL[overallRank] ?? `#${overallRank}`} of {totalRacers} · #{myRank} among traders
+                  </p>
+                </>
+              )}
             </div>
 
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-              <Stat
-                label="Return"
-                value={`${me.returnPct >= 0 ? "+" : ""}${me.returnPct.toFixed(1)}%`}
-                tone={me.returnPct >= 0 ? "up" : "down"}
-              />
-              <Stat
-                label="Equity"
-                value={money(me.equity)}
-                tone={me.returnPct >= 0 ? "up" : "down"}
-              />
-              <Stat label="Trades" value={`${me.trades}`} />
-            </div>
+            {!isSpectator && (
+              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                <Stat
+                  label="Return"
+                  value={`${me.returnPct >= 0 ? "+" : ""}${me.returnPct.toFixed(1)}%`}
+                  tone={me.returnPct >= 0 ? "up" : "down"}
+                />
+                <Stat label="Equity" value={money(me.equity)} tone={me.returnPct >= 0 ? "up" : "down"} />
+                <Stat label="Trades" value={`${me.trades}`} />
+              </div>
+            )}
 
             <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/40 p-3">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Final standings</p>
@@ -436,7 +476,29 @@ export default function MultiplayerGame({
               </div>
             </div>
 
+            {!isSpectator && (
+              <p className="mt-3 text-center text-xs text-slate-500">
+                {saveStatus === "saving" && "Saving run to community…"}
+                {saveStatus === "saved" && "Run saved to community gallery."}
+                {saveStatus === "error" && "Could not save run — check connection and try another round."}
+              </p>
+            )}
+
+            <div className="mt-4">
+              <ShareButtons room={room} rank={overallRank} returnPct={isSpectator ? undefined : me.returnPct} />
+            </div>
+
             <div className="mt-5 flex flex-wrap gap-3">
+              {isHost ? (
+                <button
+                  onClick={rematch}
+                  className="flex-[2] rounded-lg bg-emerald-500 py-3 font-bold text-slate-950 hover:bg-emerald-400"
+                >
+                  Play again in this room
+                </button>
+              ) : (
+                <p className="w-full text-center text-sm text-slate-500">Waiting for host to start another round…</p>
+              )}
               <button
                 onClick={onLeave}
                 className="flex-1 rounded-lg border border-slate-700 py-3 font-semibold text-slate-200 hover:bg-slate-800"
@@ -447,7 +509,7 @@ export default function MultiplayerGame({
                 href="/community"
                 className="flex-1 rounded-lg border border-sky-500/60 bg-sky-500/10 py-3 text-center font-semibold text-sky-300 hover:bg-sky-500/20"
               >
-                Community gallery
+                Gallery
               </Link>
             </div>
           </div>
@@ -458,21 +520,21 @@ export default function MultiplayerGame({
       <div className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-3 gap-2 border-t border-slate-800 bg-slate-900/95 p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
         <button
           onClick={controls.long}
-          disabled={!running}
+          disabled={!canTrade}
           className="rounded-lg bg-emerald-600 py-3.5 text-base font-bold active:bg-emerald-500 disabled:opacity-40"
         >
           Long
         </button>
         <button
           onClick={controls.close}
-          disabled={!running}
+          disabled={!canTrade}
           className="rounded-lg bg-slate-700 py-3.5 text-base font-bold active:bg-slate-600 disabled:opacity-40"
         >
           Close
         </button>
         <button
           onClick={controls.short}
-          disabled={!running}
+          disabled={!canTrade}
           className="rounded-lg bg-rose-600 py-3.5 text-base font-bold active:bg-rose-500 disabled:opacity-40"
         >
           Short
