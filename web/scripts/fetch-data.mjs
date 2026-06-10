@@ -17,16 +17,47 @@ const INTERVAL = "1d";
 const MAX_BARS = 1600;
 
 const SYMBOLS = [
+  // Forex — majors & liquid crosses
   { id: "eurusd", yahoo: "EURUSD=X", name: "EUR/USD", kind: "forex" },
   { id: "gbpusd", yahoo: "GBPUSD=X", name: "GBP/USD", kind: "forex" },
   { id: "usdjpy", yahoo: "USDJPY=X", name: "USD/JPY", kind: "forex" },
   { id: "audusd", yahoo: "AUDUSD=X", name: "AUD/USD", kind: "forex" },
+  { id: "usdcad", yahoo: "USDCAD=X", name: "USD/CAD", kind: "forex" },
+  { id: "usdchf", yahoo: "USDCHF=X", name: "USD/CHF", kind: "forex" },
+  { id: "nzdusd", yahoo: "NZDUSD=X", name: "NZD/USD", kind: "forex" },
+  { id: "eurgbp", yahoo: "EURGBP=X", name: "EUR/GBP", kind: "forex" },
+  { id: "eurjpy", yahoo: "EURJPY=X", name: "EUR/JPY", kind: "forex" },
+  { id: "gbpjpy", yahoo: "GBPJPY=X", name: "GBP/JPY", kind: "forex" },
+  { id: "audjpy", yahoo: "AUDJPY=X", name: "AUD/JPY", kind: "forex" },
+  { id: "eurchf", yahoo: "EURCHF=X", name: "EUR/CHF", kind: "forex" },
+  // Precious metals & energy
   { id: "xauusd", yahoo: "GC=F", name: "Gold (XAU/USD)", kind: "commodity" },
+  { id: "xagusd", yahoo: "SI=F", name: "Silver (XAG/USD)", kind: "commodity" },
+  { id: "xptusd", yahoo: "PL=F", name: "Platinum", kind: "commodity" },
+  { id: "wtiusd", yahoo: "CL=F", name: "WTI Crude Oil", kind: "commodity" },
+  { id: "brentusd", yahoo: "BZ=F", name: "Brent Crude Oil", kind: "commodity" },
+  { id: "natgas", yahoo: "NG=F", name: "Natural Gas", kind: "commodity" },
+  { id: "copper", yahoo: "HG=F", name: "Copper", kind: "commodity" },
+  // Crypto
   { id: "btcusd", yahoo: "BTC-USD", name: "Bitcoin (BTC/USD)", kind: "crypto" },
+  { id: "ethusd", yahoo: "ETH-USD", name: "Ethereum (ETH/USD)", kind: "crypto" },
+  { id: "solusd", yahoo: "SOL-USD", name: "Solana (SOL/USD)", kind: "crypto" },
+  // US stocks & index ETFs
   { id: "aapl", yahoo: "AAPL", name: "Apple (AAPL)", kind: "stock" },
   { id: "msft", yahoo: "MSFT", name: "Microsoft (MSFT)", kind: "stock" },
   { id: "nvda", yahoo: "NVDA", name: "NVIDIA (NVDA)", kind: "stock" },
   { id: "tsla", yahoo: "TSLA", name: "Tesla (TSLA)", kind: "stock" },
+  { id: "googl", yahoo: "GOOGL", name: "Alphabet (GOOGL)", kind: "stock" },
+  { id: "amzn", yahoo: "AMZN", name: "Amazon (AMZN)", kind: "stock" },
+  { id: "meta", yahoo: "META", name: "Meta (META)", kind: "stock" },
+  { id: "amd", yahoo: "AMD", name: "AMD (AMD)", kind: "stock" },
+  { id: "jpm", yahoo: "JPM", name: "JPMorgan (JPM)", kind: "stock" },
+  { id: "v", yahoo: "V", name: "Visa (V)", kind: "stock" },
+  { id: "jnj", yahoo: "JNJ", name: "Johnson & Johnson (JNJ)", kind: "stock" },
+  { id: "wmt", yahoo: "WMT", name: "Walmart (WMT)", kind: "stock" },
+  { id: "spy", yahoo: "SPY", name: "S&P 500 (SPY)", kind: "stock" },
+  { id: "qqq", yahoo: "QQQ", name: "Nasdaq 100 (QQQ)", kind: "stock" },
+  { id: "coin", yahoo: "COIN", name: "Coinbase (COIN)", kind: "stock" },
 ];
 
 async function fetchSymbol(sym) {

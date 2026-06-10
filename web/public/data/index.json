@@ -3,80 +3,296 @@
     "id": "eurusd",
     "name": "EUR/USD",
     "kind": "forex",
-    "bars": 1301,
-    "from": "2021-05-30",
-    "to": "2026-05-29"
+    "bars": 1300,
+    "from": "2021-06-09",
+    "to": "2026-06-10"
   },
   {
     "id": "gbpusd",
     "name": "GBP/USD",
     "kind": "forex",
-    "bars": 1301,
-    "from": "2021-05-30",
-    "to": "2026-05-29"
+    "bars": 1300,
+    "from": "2021-06-09",
+    "to": "2026-06-10"
   },
   {
     "id": "usdjpy",
     "name": "USD/JPY",
     "kind": "forex",
-    "bars": 1301,
-    "from": "2021-05-30",
-    "to": "2026-05-30"
+    "bars": 1300,
+    "from": "2021-06-09",
+    "to": "2026-06-10"
   },
   {
     "id": "audusd",
     "name": "AUD/USD",
     "kind": "forex",
-    "bars": 1301,
-    "from": "2021-05-30",
-    "to": "2026-05-30"
+    "bars": 1300,
+    "from": "2021-06-09",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "usdcad",
+    "name": "USD/CAD",
+    "kind": "forex",
+    "bars": 1300,
+    "from": "2021-06-09",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "usdchf",
+    "name": "USD/CHF",
+    "kind": "forex",
+    "bars": 1300,
+    "from": "2021-06-09",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "nzdusd",
+    "name": "NZD/USD",
+    "kind": "forex",
+    "bars": 1300,
+    "from": "2021-06-09",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "eurgbp",
+    "name": "EUR/GBP",
+    "kind": "forex",
+    "bars": 1300,
+    "from": "2021-06-09",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "eurjpy",
+    "name": "EUR/JPY",
+    "kind": "forex",
+    "bars": 1300,
+    "from": "2021-06-09",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "gbpjpy",
+    "name": "GBP/JPY",
+    "kind": "forex",
+    "bars": 1300,
+    "from": "2021-06-09",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "audjpy",
+    "name": "AUD/JPY",
+    "kind": "forex",
+    "bars": 1300,
+    "from": "2021-06-09",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "eurchf",
+    "name": "EUR/CHF",
+    "kind": "forex",
+    "bars": 1300,
+    "from": "2021-06-09",
+    "to": "2026-06-10"
   },
   {
     "id": "xauusd",
     "name": "Gold (XAU/USD)",
     "kind": "commodity",
-    "bars": 1257,
-    "from": "2021-06-01",
-    "to": "2026-05-29"
+    "bars": 1258,
+    "from": "2021-06-10",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "xagusd",
+    "name": "Silver (XAG/USD)",
+    "kind": "commodity",
+    "bars": 1258,
+    "from": "2021-06-10",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "xptusd",
+    "name": "Platinum",
+    "kind": "commodity",
+    "bars": 1258,
+    "from": "2021-06-10",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "wtiusd",
+    "name": "WTI Crude Oil",
+    "kind": "commodity",
+    "bars": 1258,
+    "from": "2021-06-10",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "brentusd",
+    "name": "Brent Crude Oil",
+    "kind": "commodity",
+    "bars": 1259,
+    "from": "2021-06-10",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "natgas",
+    "name": "Natural Gas",
+    "kind": "commodity",
+    "bars": 1259,
+    "from": "2021-06-10",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "copper",
+    "name": "Copper",
+    "kind": "commodity",
+    "bars": 1259,
+    "from": "2021-06-10",
+    "to": "2026-06-10"
   },
   {
     "id": "btcusd",
     "name": "Bitcoin (BTC/USD)",
     "kind": "crypto",
     "bars": 1600,
-    "from": "2022-01-12",
-    "to": "2026-05-30"
+    "from": "2022-01-23",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "ethusd",
+    "name": "Ethereum (ETH/USD)",
+    "kind": "crypto",
+    "bars": 1600,
+    "from": "2022-01-23",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "solusd",
+    "name": "Solana (SOL/USD)",
+    "kind": "crypto",
+    "bars": 1600,
+    "from": "2022-01-23",
+    "to": "2026-06-10"
   },
   {
     "id": "aapl",
     "name": "Apple (AAPL)",
     "kind": "stock",
     "bars": 1255,
-    "from": "2021-06-01",
-    "to": "2026-05-29"
+    "from": "2021-06-11",
+    "to": "2026-06-10"
   },
   {
     "id": "msft",
     "name": "Microsoft (MSFT)",
     "kind": "stock",
     "bars": 1255,
-    "from": "2021-06-01",
-    "to": "2026-05-29"
+    "from": "2021-06-11",
+    "to": "2026-06-10"
   },
   {
     "id": "nvda",
     "name": "NVIDIA (NVDA)",
     "kind": "stock",
     "bars": 1255,
-    "from": "2021-06-01",
-    "to": "2026-05-29"
+    "from": "2021-06-11",
+    "to": "2026-06-10"
   },
   {
     "id": "tsla",
     "name": "Tesla (TSLA)",
     "kind": "stock",
     "bars": 1255,
-    "from": "2021-06-01",
-    "to": "2026-05-29"
+    "from": "2021-06-11",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "googl",
+    "name": "Alphabet (GOOGL)",
+    "kind": "stock",
+    "bars": 1255,
+    "from": "2021-06-11",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "amzn",
+    "name": "Amazon (AMZN)",
+    "kind": "stock",
+    "bars": 1255,
+    "from": "2021-06-11",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "meta",
+    "name": "Meta (META)",
+    "kind": "stock",
+    "bars": 1255,
+    "from": "2021-06-11",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "amd",
+    "name": "AMD (AMD)",
+    "kind": "stock",
+    "bars": 1255,
+    "from": "2021-06-11",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "jpm",
+    "name": "JPMorgan (JPM)",
+    "kind": "stock",
+    "bars": 1255,
+    "from": "2021-06-11",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "v",
+    "name": "Visa (V)",
+    "kind": "stock",
+    "bars": 1255,
+    "from": "2021-06-11",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "jnj",
+    "name": "Johnson & Johnson (JNJ)",
+    "kind": "stock",
+    "bars": 1255,
+    "from": "2021-06-11",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "wmt",
+    "name": "Walmart (WMT)",
+    "kind": "stock",
+    "bars": 1255,
+    "from": "2021-06-11",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "spy",
+    "name": "S&P 500 (SPY)",
+    "kind": "stock",
+    "bars": 1255,
+    "from": "2021-06-11",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "qqq",
+    "name": "Nasdaq 100 (QQQ)",
+    "kind": "stock",
+    "bars": 1255,
+    "from": "2021-06-11",
+    "to": "2026-06-10"
+  },
+  {
+    "id": "coin",
+    "name": "Coinbase (COIN)",
+    "kind": "stock",
+    "bars": 1255,
+    "from": "2021-06-11",
+    "to": "2026-06-10"
   }
 ]
