@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import CandleChart from "@/components/CandleChart";
 import DanmakuOverlay from "@/components/DanmakuOverlay";
@@ -79,6 +79,64 @@ export default function MultiplayerGame({
   const isMobile = useIsMobile();
   const chartHeight = isMobile ? 300 : 440;
   const [copied, setCopied] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatHidden, setChatHidden] = useState(false);
+  const [danmakuOn, setDanmakuOn] = useState(true);
+  const [chatMenuOpen, setChatMenuOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
+  const [chatPeek, setChatPeek] = useState<{ name: string; text: string } | null>(null);
+  const chatMenuRef = useRef<HTMLDivElement>(null);
+  const prevMsgLenRef = useRef(0);
+  const peekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const chatVisible = isMobile ? chatOpen : !chatHidden;
+
+  useEffect(() => {
+    if (!chatMenuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (chatMenuRef.current && !chatMenuRef.current.contains(e.target as Node)) setChatMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [chatMenuOpen]);
+
+  function openChat() {
+    setChatOpen(true);
+    setChatHidden(false);
+    setUnread(0);
+    setChatPeek(null);
+    if (peekTimerRef.current) clearTimeout(peekTimerRef.current);
+  }
+
+  function hideChat() {
+    if (isMobile) setChatOpen(false);
+    else setChatHidden(true);
+    setChatMenuOpen(false);
+  }
+
+  function toggleChat() {
+    if (chatVisible) hideChat();
+    else openChat();
+  }
+
+  useEffect(() => {
+    if (chatMessages.length <= prevMsgLenRef.current) {
+      prevMsgLenRef.current = chatMessages.length;
+      return;
+    }
+    const added = chatMessages.length - prevMsgLenRef.current;
+    prevMsgLenRef.current = chatMessages.length;
+    const visible = isMobile ? chatOpen : !chatHidden;
+    if (visible || added <= 0) return;
+
+    setUnread((u) => u + added);
+    if (!danmakuOn) {
+      const latest = chatMessages[chatMessages.length - 1];
+      setChatPeek({ name: latest.name, text: latest.text });
+      if (peekTimerRef.current) clearTimeout(peekTimerRef.current);
+      peekTimerRef.current = setTimeout(() => setChatPeek(null), 6000);
+    }
+  }, [chatMessages, chatOpen, chatHidden, isMobile, danmakuOn]);
 
   function copyInvite() {
     const url =
@@ -195,6 +253,63 @@ export default function MultiplayerGame({
             {phase === "running" && `Live · bar ${snapshot.bar}`}
             {phase === "finished" && "Race over"}
           </span>
+          <div className="relative" ref={chatMenuRef}>
+            <div className="flex items-center overflow-hidden rounded-md bg-slate-800">
+              <button
+                type="button"
+                onClick={toggleChat}
+                className="relative px-2.5 py-1.5 text-sm hover:bg-slate-700"
+                aria-label={chatVisible ? "Hide chat" : "Show chat"}
+              >
+                💬
+                {unread > 0 && !chatVisible && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-500 px-1 text-[10px] font-bold text-white">
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setChatMenuOpen((o) => !o)}
+                className="border-l border-slate-700 px-1.5 py-1.5 text-xs text-slate-400 hover:bg-slate-700"
+                aria-label="Chat settings"
+              >
+                ▾
+              </button>
+            </div>
+            {chatMenuOpen && (
+              <div className="absolute right-0 top-full z-30 mt-1 w-52 rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-xl">
+                <button
+                  type="button"
+                  onClick={() => setDanmakuOn((on) => !on)}
+                  className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm hover:bg-slate-800"
+                >
+                  <span className="text-slate-200">Danmaku on chart</span>
+                  <span className={danmakuOn ? "text-emerald-400" : "text-slate-500"}>{danmakuOn ? "On" : "Off"}</span>
+                </button>
+                {!isMobile && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChatHidden((h) => !h);
+                      if (chatHidden) setUnread(0);
+                    }}
+                    className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm hover:bg-slate-800"
+                  >
+                    <span className="text-slate-200">Chat panel</span>
+                    <span className={chatHidden ? "text-slate-500" : "text-emerald-400"}>
+                      {chatHidden ? "Hidden" : "Shown"}
+                    </span>
+                  </button>
+                )}
+                {isMobile && (
+                  <p className="px-2 py-1 text-xs text-slate-500">
+                    Messages fly as danmaku by default. Tap 💬 to open the full chat.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
           <button onClick={copyInvite} className="rounded-md bg-slate-800 px-3 py-1.5 text-sm hover:bg-slate-700">
             {copied ? "✓ Copied" : "Invite"}
           </button>
@@ -236,7 +351,7 @@ export default function MultiplayerGame({
                 onSell={controls.short}
                 onClose={controls.close}
               />
-              <DanmakuOverlay items={danmaku} />
+              <DanmakuOverlay items={danmaku} enabled={danmakuOn} />
             </div>
 
             {phase !== "running" && phase !== "finished" && (
@@ -308,7 +423,9 @@ export default function MultiplayerGame({
             )}
           </div>
 
-          <RoomChat messages={chatMessages} onSend={sendChat} />
+          {!isMobile && !chatHidden && (
+            <RoomChat messages={chatMessages} onSend={sendChat} onClose={hideChat} />
+          )}
 
           {/* Desktop controls + stats */}
           <div className="hidden rounded-xl border border-slate-800 bg-slate-900/60 p-4 lg:block">
@@ -514,6 +631,37 @@ export default function MultiplayerGame({
             </div>
           </div>
         </div>
+      )}
+
+      {isMobile && !danmakuOn && chatPeek && !chatOpen && (
+        <button
+          type="button"
+          onClick={openChat}
+          className="fixed inset-x-3 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-[19] flex items-center gap-2 rounded-xl border border-sky-500/40 bg-slate-900/95 px-3 py-2.5 text-left text-sm shadow-lg backdrop-blur active:bg-slate-800"
+        >
+          <span className="shrink-0 font-semibold text-sky-300">{chatPeek.name}</span>
+          <span className="min-w-0 truncate text-slate-200">{chatPeek.text}</span>
+          <span className="ml-auto shrink-0 text-xs text-sky-400">Open</span>
+        </button>
+      )}
+
+      {isMobile && chatOpen && (
+        <>
+          <div className="fixed inset-0 z-30 bg-slate-950/60" onClick={hideChat} aria-hidden />
+          <div className="chat-sheet fixed inset-x-0 bottom-0 z-40 flex max-h-[min(72vh,520px)] flex-col rounded-t-2xl border-t border-slate-700 bg-slate-900 shadow-2xl">
+            <div className="flex justify-center py-2">
+              <div className="h-1 w-10 rounded-full bg-slate-700" />
+            </div>
+            <RoomChat
+              messages={chatMessages}
+              onSend={sendChat}
+              onClose={hideChat}
+              variant="sheet"
+              className="min-h-0 flex-1 rounded-none border-0 border-t border-slate-800"
+            />
+            <div className="h-[env(safe-area-inset-bottom)]" />
+          </div>
+        </>
       )}
 
       {/* Mobile sticky trade bar */}
