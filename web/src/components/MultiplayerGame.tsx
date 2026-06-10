@@ -79,7 +79,6 @@ export default function MultiplayerGame({
   const isMobile = useIsMobile();
   const [copied, setCopied] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [rankOpen, setRankOpen] = useState(false);
   const [chatHidden, setChatHidden] = useState(false);
   const [danmakuOn, setDanmakuOn] = useState(true);
   const [chatMenuOpen, setChatMenuOpen] = useState(false);
@@ -98,14 +97,8 @@ export default function MultiplayerGame({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [chatMenuOpen]);
 
-  function closeMobilePanels() {
-    setChatOpen(false);
-    setRankOpen(false);
-  }
-
   function openChat() {
     setChatOpen(true);
-    setRankOpen(false);
     setChatHidden(false);
     setUnread(0);
   }
@@ -124,14 +117,6 @@ export default function MultiplayerGame({
     }
     if (chatVisible) hideChat();
     else openChat();
-  }
-
-  function toggleRank() {
-    if (rankOpen) setRankOpen(false);
-    else {
-      setRankOpen(true);
-      setChatOpen(false);
-    }
   }
 
   useEffect(() => {
@@ -351,6 +336,7 @@ export default function MultiplayerGame({
                 onClose={controls.close}
               />
               <DanmakuOverlay items={danmaku} enabled={danmakuOn} />
+              {isMobile && <MiniRaceLeaderboard rows={snapshot.leaderboard} />}
             </div>
 
             {phase !== "running" && phase !== "finished" && (
@@ -587,72 +573,36 @@ export default function MultiplayerGame({
 
       {isMobile && (
         <>
-          <div className="fixed right-0 top-[40%] z-30 flex -translate-y-1/2 flex-col gap-1">
-            <button
-              type="button"
-              onClick={toggleRank}
-              className={`relative flex h-11 w-9 flex-col items-center justify-center rounded-l-lg border border-r-0 border-slate-700 text-[10px] font-bold shadow-lg backdrop-blur active:bg-slate-800 ${
-                rankOpen ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-900/95 text-emerald-400"
-              }`}
-              aria-label={rankOpen ? "Close rankings" : "Open rankings"}
-            >
-              {myRank > 0 ? `#${myRank}` : "#"}
-            </button>
-            <button
-              type="button"
-              onClick={toggleChat}
-              className={`relative flex h-11 w-9 flex-col items-center justify-center rounded-l-lg border border-r-0 border-slate-700 text-sm shadow-lg backdrop-blur active:bg-slate-800 ${
-                chatOpen ? "bg-sky-500/20" : "bg-slate-900/95"
-              }`}
-              aria-label={chatOpen ? "Close chat" : "Open chat"}
-            >
-              <span>💬</span>
-              {unread > 0 && !chatOpen && (
-                <span className="absolute -left-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-500 px-1 text-[9px] font-bold text-white">
-                  {unread > 9 ? "9+" : unread}
-                </span>
-              )}
-            </button>
-          </div>
-          {(rankOpen || chatOpen) && (
-            <div className="fixed inset-0 z-30 bg-transparent" onClick={closeMobilePanels} aria-hidden />
-          )}
-          {rankOpen && (
-            <div className="chat-sheet-right fixed right-0 top-12 z-40 flex w-[min(18rem,78vw)] flex-col overflow-hidden border-l border-slate-700 bg-slate-900/98 shadow-2xl backdrop-blur bottom-[calc(3.75rem+env(safe-area-inset-bottom))]">
-              <div className="flex shrink-0 items-center justify-between border-b border-slate-800 px-3 py-2.5">
-                <div>
-                  <div className="text-sm font-semibold text-slate-200">Live race</div>
-                  {myRank > 0 && (
-                    <div className="text-xs text-slate-500">
-                      You are #{myRank} of {humanCount}
-                    </div>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setRankOpen(false)}
-                  className="rounded-md px-2 py-0.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                >
-                  Close
-                </button>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto p-2">
-                <RaceLeaderboard rows={snapshot.leaderboard} />
-              </div>
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={toggleChat}
+            className={`fixed right-0 top-[42%] z-30 flex h-11 w-9 -translate-y-1/2 flex-col items-center justify-center rounded-l-lg border border-r-0 border-slate-700 text-sm shadow-lg backdrop-blur active:bg-slate-800 ${
+              chatOpen ? "bg-sky-500/20" : "bg-slate-900/95"
+            }`}
+            aria-label={chatOpen ? "Close chat" : "Open chat"}
+          >
+            <span>💬</span>
+            {unread > 0 && !chatOpen && (
+              <span className="absolute -left-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-500 px-1 text-[9px] font-bold text-white">
+                {unread > 9 ? "9+" : unread}
+              </span>
+            )}
+          </button>
           {chatOpen && (
-            <div className="chat-sheet-right fixed right-0 top-12 z-40 flex w-[min(16rem,72vw)] flex-col justify-end border-l border-slate-700 bg-slate-900/98 p-3 shadow-2xl backdrop-blur bottom-[calc(3.75rem+env(safe-area-inset-bottom))]">
-              <RoomChat
-                messages={chatMessages}
-                onSend={(text) => {
-                  sendChat(text);
-                  hideChat();
-                }}
-                onClose={hideChat}
-                variant="input"
-              />
-            </div>
+            <>
+              <div className="fixed inset-0 z-30 bg-transparent" onClick={hideChat} aria-hidden />
+              <div className="chat-sheet-right fixed right-0 top-12 z-40 flex w-[min(16rem,72vw)] flex-col justify-end border-l border-slate-700 bg-slate-900/98 p-3 shadow-2xl backdrop-blur bottom-[calc(3.75rem+env(safe-area-inset-bottom))]">
+                <RoomChat
+                  messages={chatMessages}
+                  onSend={(text) => {
+                    sendChat(text);
+                    hideChat();
+                  }}
+                  onClose={hideChat}
+                  variant="input"
+                />
+              </div>
+            </>
           )}
         </>
       )}
@@ -695,6 +645,46 @@ type LeaderboardRow = {
   equity: number;
   returnPct: number;
 };
+
+function miniName(name: string, isBot: boolean) {
+  const n = name.trim();
+  if (!isBot) return n.length > 6 ? `${n.slice(0, 5)}…` : n;
+  const short: Record<string, string> = {
+    "RSI Scalper": "RSI",
+    "EMA Slope": "EMA",
+    "MACD Rider": "MACD",
+    "Bollinger Bounce": "BB",
+    "Breakout Hunter": "BO",
+    "Mean Revert": "MR",
+    "Trend Follow": "TF",
+  };
+  return short[n] ?? (n.length > 5 ? `${n.slice(0, 4)}…` : n);
+}
+
+function MiniRaceLeaderboard({ rows }: { rows: LeaderboardRow[] }) {
+  return (
+    <div className="pointer-events-none absolute top-1 right-1 z-10 w-[6.75rem] rounded border border-slate-700/70 bg-slate-950/80 px-1 py-0.5 text-[7px] leading-[1.35] shadow-md backdrop-blur-sm">
+      {rows.map((r, i) => (
+        <div
+          key={r.id}
+          className={`flex items-center gap-0.5 ${r.isMe ? "font-semibold text-emerald-300" : "text-slate-300"}`}
+        >
+          <span className="w-2.5 shrink-0 font-mono text-slate-500">{i + 1}</span>
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: r.color }} />
+          <span className="min-w-0 flex-1 truncate">{miniName(r.name, r.isBot)}</span>
+          <span
+            className={`shrink-0 font-mono tabular-nums ${
+              r.returnPct >= 0 ? "text-emerald-400" : "text-rose-400"
+            }`}
+          >
+            {r.returnPct >= 0 ? "+" : ""}
+            {r.returnPct.toFixed(0)}%
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function RaceLeaderboard({ rows }: { rows: LeaderboardRow[] }) {
   return (
