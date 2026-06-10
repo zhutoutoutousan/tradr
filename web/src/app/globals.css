@@ -18,6 +18,10 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
+.danmaku-track {
+  container-type: inline-size;
+}
+
 @keyframes danmaku-scroll {
   from {
     transform: translateX(0);
@@ -30,12 +34,13 @@ body {
     opacity: 1;
   }
   to {
-    transform: translateX(calc(-1 * var(--danmaku-distance, 400px) - 100%));
+    transform: translateX(calc(-100cqw - 100%));
     opacity: 0;
   }
 }
 
 .danmaku-bullet {
+  left: 100%;
   animation: danmaku-scroll 9s linear forwards;
 }
 
