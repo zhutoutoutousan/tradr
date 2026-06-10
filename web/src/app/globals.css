@@ -20,17 +20,17 @@ body {
 
 @keyframes danmaku-scroll {
   from {
-    transform: translateX(100%);
+    transform: translateX(0);
     opacity: 0;
   }
-  5% {
+  4% {
     opacity: 1;
   }
-  95% {
+  96% {
     opacity: 1;
   }
   to {
-    transform: translateX(calc(-100% - 40vw));
+    transform: translateX(calc(-1 * var(--danmaku-distance, 400px) - 100%));
     opacity: 0;
   }
 }
