@@ -10,6 +10,7 @@
     "start:lan": "next start -H 0.0.0.0",
     "lint": "eslint",
     "fetch-data": "node scripts/fetch-data.mjs",
+    "db:migrate": "node scripts/apply-anonymous-games-migration.mjs",
     "test:e2e": "playwright test --project=chromium",
     "test:e2e:all": "playwright test",
     "test:e2e:mobile": "playwright test --project=mobile",

@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { normalizeCommunityReview, type CommunityGameRow } from "@/lib/game/anonymousGames";
+import type { RoundReview } from "@/lib/game/reviews";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -26,18 +28,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ games: [] });
   }
 
-  const games = (data ?? []).map((row) => ({
-    id: row.id as string,
-    deviceId: row.device_id as string,
-    createdAt: row.created_at as string,
-    mode: row.mode as "solo" | "multiplayer",
-    marketLabel: row.market_label as string,
-    rank: Number(row.rank),
-    returnPct: Number(row.return_pct),
-    profit: Number(row.profit),
-    trades: Number(row.trades),
-    review: row.review_json,
-  }));
+  const games = (data ?? []).map((row) => {
+    const base = {
+      id: row.id as string,
+      deviceId: row.device_id as string,
+      createdAt: row.created_at as string,
+      mode: row.mode as "solo" | "multiplayer",
+      marketLabel: row.market_label as string,
+      rank: Number(row.rank),
+      returnPct: Number(row.return_pct),
+      profit: Number(row.profit),
+      trades: Number(row.trades),
+      review: row.review_json as Partial<RoundReview> | null,
+    };
+    return { ...base, review: normalizeCommunityReview(base as CommunityGameRow) };
+  });
 
   return NextResponse.json({ games });
 }

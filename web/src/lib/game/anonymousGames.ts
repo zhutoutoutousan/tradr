@@ -17,6 +17,42 @@ export interface CommunityGame {
   isMine: boolean;
 }
 
+export interface CommunityGameRow {
+  id: string;
+  deviceId: string;
+  createdAt: string;
+  mode: "solo" | "multiplayer";
+  marketLabel: string;
+  rank: number;
+  returnPct: number;
+  profit: number;
+  trades: number;
+  review: Partial<RoundReview> | null;
+}
+
+/** Rebuild a full RoundReview from stored JSON + list-row stats (older/incomplete saves). */
+export function normalizeCommunityReview(row: CommunityGameRow): RoundReview {
+  const r = row.review ?? {};
+  return {
+    id: r.id ?? row.id,
+    createdAt: r.createdAt ?? new Date(row.createdAt).getTime(),
+    marketId: r.marketId ?? "synthetic",
+    marketLabel: r.marketLabel ?? row.marketLabel,
+    seed: r.seed ?? 0,
+    candles: Array.isArray(r.candles) ? r.candles : [],
+    trades: Array.isArray(r.trades) ? r.trades : [],
+    summary: r.summary ?? {
+      returnPct: row.returnPct,
+      profit: row.profit,
+      trades: row.trades,
+      wins: 0,
+      rank: row.rank,
+      totalPlayers: 0,
+      eloDelta: 0,
+    },
+  };
+}
+
 export async function saveAnonymousGame(
   result: RoundResult,
   setup: RoundSetup,
@@ -48,6 +84,10 @@ export async function fetchCommunityGames(limit = 24): Promise<CommunityGame[]> 
   const deviceId = getDeviceId();
   const res = await fetch(`/api/games?limit=${limit}`, { cache: "no-store" });
   if (!res.ok) return [];
-  const data = (await res.json()) as { games?: CommunityGame[] };
-  return (data.games ?? []).map((g) => ({ ...g, isMine: g.deviceId === deviceId }));
+  const data = (await res.json()) as { games?: CommunityGameRow[] };
+  return (data.games ?? []).map((g) => ({
+    ...g,
+    review: normalizeCommunityReview(g),
+    isMine: g.deviceId === deviceId,
+  }));
 }

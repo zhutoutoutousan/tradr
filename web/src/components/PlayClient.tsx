@@ -108,7 +108,9 @@ export default function PlayClient() {
     (result: RoundResult) => {
       setLastResult(result);
       if (setup) {
-        saveAnonymousGame(result, setup, "solo").catch(() => {});
+        saveAnonymousGame(result, setup, "solo").catch((err) => {
+          console.warn("community save failed", err);
+        });
       }
     },
     [setup],
