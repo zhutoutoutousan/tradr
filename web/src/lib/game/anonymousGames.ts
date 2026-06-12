@@ -88,12 +88,36 @@ export function mapCommunityGameRow(row: CommunityGameRow, deviceId: string): Co
   };
 }
 
-export async function fetchCommunityGames(limit = 24): Promise<CommunityGame[]> {
+export interface CommunityGamesPage {
+  games: CommunityGame[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+export async function fetchCommunityGamesPage(
+  limit = 24,
+  cursor?: string | null,
+): Promise<CommunityGamesPage> {
   const deviceId = getDeviceId();
-  const res = await fetch(`/api/games?limit=${limit}`, { cache: "no-store" });
-  if (!res.ok) return [];
-  const data = (await res.json()) as { games?: CommunityGameRow[] };
-  return (data.games ?? []).map((g) => mapCommunityGameRow(g, deviceId));
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) params.set("cursor", cursor);
+  const res = await fetch(`/api/games?${params}`, { cache: "no-store" });
+  if (!res.ok) return { games: [], nextCursor: null, hasMore: false };
+  const data = (await res.json()) as {
+    games?: CommunityGameRow[];
+    nextCursor?: string | null;
+    hasMore?: boolean;
+  };
+  return {
+    games: (data.games ?? []).map((g) => mapCommunityGameRow(g, deviceId)),
+    nextCursor: data.nextCursor ?? null,
+    hasMore: Boolean(data.hasMore),
+  };
+}
+
+export async function fetchCommunityGames(limit = 24): Promise<CommunityGame[]> {
+  const page = await fetchCommunityGamesPage(limit);
+  return page.games;
 }
 
 export async function fetchCommunityGame(id: string): Promise<CommunityGame | null> {
