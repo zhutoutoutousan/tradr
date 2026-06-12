@@ -15,13 +15,20 @@ export async function GET(req: NextRequest) {
   const sb = db();
   if (!sb) return NextResponse.json({ games: [] });
 
-  const limit = Math.min(50, Math.max(1, Number(req.nextUrl.searchParams.get("limit") ?? 24)));
+  const limit = Math.min(100, Math.max(1, Number(req.nextUrl.searchParams.get("limit") ?? 24)));
+  const cursor = req.nextUrl.searchParams.get("cursor");
 
-  const { data, error } = await sb
+  let query = sb
     .from("anonymous_games")
     .select("id, device_id, created_at, mode, market_label, rank, return_pct, profit, trades, review_json")
     .order("created_at", { ascending: false })
     .limit(limit);
+
+  if (cursor) {
+    query = query.lt("created_at", cursor);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("games GET", error.message);
@@ -44,7 +51,12 @@ export async function GET(req: NextRequest) {
     return { ...base, review: normalizeCommunityReview(base as CommunityGameRow) };
   });
 
-  return NextResponse.json({ games });
+  const rows = data ?? [];
+  const last = rows[rows.length - 1];
+  const hasMore = rows.length === limit;
+  const nextCursor = hasMore && last ? (last.created_at as string) : null;
+
+  return NextResponse.json({ games, nextCursor, hasMore });
 }
 
 export async function POST(req: NextRequest) {
