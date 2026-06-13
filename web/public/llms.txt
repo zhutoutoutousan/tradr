@@ -1,0 +1,28 @@
+# Tradr
+
+> Free browser trading game — 3-minute races vs algorithmic bots on live candlestick charts.
+
+## Official links
+
+- Play: https://tradr.it.com/
+- Multiplayer: https://tradr.it.com/multiplayer
+- Community gallery: https://tradr.it.com/community
+- Sitemap: https://tradr.it.com/sitemap.xml
+
+## What is Tradr?
+
+Tradr (tradr.it.com) is a free web trading game for practice and competition—not real-money trading or financial advice. You trade on a TradingView-style chart while algorithmic bots (RSI scalping, EMA trend, Darvas-style breakouts) trade the same market. Rounds last three minutes; highest return wins.
+
+## Modes
+
+- **Solo**: Random or historical markets (forex, gold, stocks, crypto daily data).
+- **Multiplayer**: Shared seeded rooms; lobby lists open rooms with traders waiting.
+- **Community gallery**: Anonymous run replays; **Play alongside** lets you trade live while a recorded session replays as a "Peer trader" bot.
+
+## Tech
+
+Next.js, TypeScript, canvas chart, Supabase Realtime + Postgres for multiplayer and gallery.
+
+## Keywords
+
+trading game, browser trading game, paper trading simulator, algorithmic trading bots, multiplayer trading game, free trading game, Tradr

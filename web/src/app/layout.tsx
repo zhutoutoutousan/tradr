@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { rootMetadata } from "@/lib/seo/metadata";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,11 +15,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Tradr — Trading You vs Trading Bots",
-  description:
-    "A real-time trading game. Trade a live market on a TradingView-style chart while algorithmic bots trade alongside you. Beat the machines.",
-};
+export const metadata: Metadata = rootMetadata();
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -37,6 +35,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <JsonLd />
         {children}
         <Analytics />
       </body>
