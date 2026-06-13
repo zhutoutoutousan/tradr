@@ -3,6 +3,7 @@
 import { useState } from "react";
 import MultiplayerGame from "@/components/MultiplayerGame";
 import type { MpRole } from "@/hooks/useMultiplayer";
+import { useMultiplayerRooms } from "@/hooks/useMultiplayerRooms";
 
 function randomRoom() {
   const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -24,6 +25,7 @@ export default function MultiplayerJoin({
   const [name, setName] = useState("");
   const [room, setRoom] = useState(initialRoom.toUpperCase());
   const [role, setRole] = useState<MpRole>(initialSpectate ? "spectator" : "player");
+  const { rooms, loading: roomsLoading, enabled: roomsEnabled } = useMultiplayerRooms();
 
   function join(e?: React.FormEvent) {
     e?.preventDefault();
@@ -95,6 +97,56 @@ export default function MultiplayerJoin({
               </button>
             </div>
           </div>
+          {roomsEnabled && (
+            <div>
+              <label className="mb-2 block text-sm text-slate-300">Open rooms</label>
+              {roomsLoading ? (
+                <p className="rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-3 text-sm text-slate-500">
+                  Loading rooms…
+                </p>
+              ) : rooms.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-slate-800 px-3 py-3 text-sm text-slate-500">
+                  No open rooms right now — create one below or enter a room code.
+                </p>
+              ) : (
+                <ul
+                  className="max-h-44 space-y-2 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/50 p-2"
+                  data-testid="open-rooms-list"
+                >
+                  {rooms.map((r) => {
+                    const selected = room === r.code;
+                    const traderLabel = r.traders === 1 ? "1 trader" : `${r.traders} traders`;
+                    const spectatorLabel =
+                      r.spectators > 0
+                        ? r.spectators === 1
+                          ? " · 1 observer"
+                          : ` · ${r.spectators} observers`
+                        : "";
+                    return (
+                      <li key={r.code}>
+                        <button
+                          type="button"
+                          data-testid={`open-room-${r.code}`}
+                          onClick={() => setRoom(r.code)}
+                          className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
+                            selected
+                              ? "border-sky-500 bg-sky-500/10 text-sky-100"
+                              : "border-slate-800 text-slate-200 hover:border-slate-600 hover:bg-slate-800/80"
+                          }`}
+                        >
+                          <span className="font-mono font-semibold tracking-wide">{r.code}</span>
+                          <span className="text-xs text-slate-400">
+                            {traderLabel}
+                            {spectatorLabel}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-sm text-slate-300">Room code (optional)</label>
             <div className="flex gap-2">
