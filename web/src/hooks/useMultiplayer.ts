@@ -9,6 +9,7 @@ import { supabase, supabaseEnabled } from "@/lib/supabase";
 import type { Candle, Side } from "@/lib/sim/types";
 import type { DanmakuItem } from "@/components/DanmakuOverlay";
 import { buildMultiplayerReview, mpRoundSetup, saveMultiplayerRound } from "@/lib/game/multiplayerRound";
+import { MP_LOBBY_CHANNEL, type MpRole } from "@/lib/multiplayer/lobby";
 
 const MS_PER_TICK = 1000 / 9; // must match the synthetic feed's intended speed
 const COUNTDOWN_MS = 4000;
@@ -33,7 +34,7 @@ function colorForId(id: string): number {
 }
 
 export type MpPhase = "disabled" | "connecting" | "lobby" | "countdown" | "running" | "finished";
-export type MpRole = "player" | "spectator";
+export type { MpRole } from "@/lib/multiplayer/lobby";
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 export interface ChatMessage {
@@ -130,6 +131,7 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
   }
   const joinedAtRef = useRef<number>(Date.now());
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const lobbyChannelRef = useRef<RealtimeChannel | null>(null);
   const startEpochRef = useRef<number | null>(null);
   const lastPushRef = useRef<number>(0);
   const presenceRef = useRef<Record<string, PresenceMeta>>({});
@@ -388,6 +390,29 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
       sb.removeChannel(ch);
     };
   }, [room, pushPresence]);
+
+  // Announce this session on the global lobby so others can browse open rooms.
+  useEffect(() => {
+    if (!supabaseEnabled || !supabase) return;
+    const sb = supabase;
+    const lobby = sb.channel(MP_LOBBY_CHANNEL, {
+      config: { presence: { key: myIdRef.current } },
+    });
+    lobbyChannelRef.current = lobby;
+
+    const trackLobby = () => {
+      lobby.track({ room: room.toUpperCase(), role: roleRef.current });
+    };
+
+    lobby.subscribe((status) => {
+      if (status === "SUBSCRIBED") trackLobby();
+    });
+
+    return () => {
+      lobbyChannelRef.current = null;
+      sb.removeChannel(lobby);
+    };
+  }, [room]);
 
   // Game loop: deterministic, wall-clock synchronized across all clients.
   useEffect(() => {
