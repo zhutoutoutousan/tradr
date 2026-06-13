@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeCommunityReview, type CommunityGameRow } from "@/lib/game/anonymousGames";
 import type { RoundReview } from "@/lib/game/reviews";
+import type { RoundSetup } from "@/lib/game/roundSetup";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   let query = sb
     .from("anonymous_games")
-    .select("id, device_id, created_at, mode, market_label, rank, return_pct, profit, trades, review_json")
+    .select("id, device_id, created_at, mode, market_label, rank, return_pct, profit, trades, review_json, setup_json")
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -47,6 +48,7 @@ export async function GET(req: NextRequest) {
       profit: Number(row.profit),
       trades: Number(row.trades),
       review: row.review_json as Partial<RoundReview> | null,
+      setup: (row.setup_json as RoundSetup | null) ?? null,
     };
     return { ...base, review: normalizeCommunityReview(base as CommunityGameRow) };
   });

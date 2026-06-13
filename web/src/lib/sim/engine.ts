@@ -1,5 +1,7 @@
 import { ALL_STRATEGIES, type Strategy } from "./strategies";
 import { BASE_ELO, type BotSpec } from "./botFactory";
+import type { GhostBotSpec, GhostReplayState } from "./ghostReplay";
+import { tickGhostReplay } from "./ghostReplay";
 import type { Account, ClosedTrade, IMarket, Position, Side } from "./types";
 
 export const STARTING_BALANCE = 10000;
@@ -109,8 +111,11 @@ export class GameEngine {
   bots: Trader[];
   ticks = 0; // gameplay ticks elapsed (excludes market warmup)
   botsFrozen = false; // Freeze power-up: bots stop making decisions
+  ghostBotId: string | null = null;
+  private ghostReplayState: GhostReplayState | null = null;
+  private ghostTrades: GhostBotSpec["trades"] | null = null;
 
-  constructor(market: IMarket, bots?: BotSpec[], cfg: EngineConfig = {}) {
+  constructor(market: IMarket, bots?: BotSpec[], cfg: EngineConfig = {}, ghost?: GhostBotSpec) {
     this.market = market;
     this.player = {
       id: "you",
@@ -140,6 +145,25 @@ export class GameEngine {
       strategy: s.strategy,
       state: {},
     }));
+
+    if (ghost) {
+      this.bots.unshift({
+        id: ghost.id,
+        kind: "bot",
+        name: ghost.name,
+        color: ghost.color,
+        blurb: ghost.blurb,
+        exposure: cfg.botExposure ?? 2,
+        exposureMult: 1,
+        rating: BASE_ELO,
+        shieldActive: false,
+        account: newAccount(),
+        state: {},
+      });
+      this.ghostBotId = ghost.id;
+      this.ghostTrades = ghost.trades;
+      this.ghostReplayState = { index: 0 };
+    }
   }
 
   private checkStops(t: Trader, price: number, bar: number) {
@@ -191,7 +215,15 @@ export class GameEngine {
     // Bot decisions run on bar close (matching the EA "new bar" logic) unless
     // the player has frozen the field with a power-up.
     if (newBar && !this.botsFrozen) {
-      for (const b of this.bots) this.runBot(b);
+      for (const b of this.bots) {
+        if (b.id === this.ghostBotId) continue;
+        this.runBot(b);
+      }
+    }
+
+    if (this.ghostBotId && this.ghostReplayState && this.ghostTrades) {
+      const ghost = this.bots.find((b) => b.id === this.ghostBotId);
+      if (ghost) tickGhostReplay(ghost, this.ghostTrades, this.ghostReplayState, bar);
     }
 
     // Track peak equity for drawdown stats.

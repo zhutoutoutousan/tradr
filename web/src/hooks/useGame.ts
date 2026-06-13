@@ -17,11 +17,12 @@ import {
 import { POWERUPS, POWERUPS_BY_ID, type PowerupId } from "@/lib/game/powerups";
 import type { DealTrade, RoundReview } from "@/lib/game/reviews";
 import { instrumentLabel, type RoundSetup } from "@/lib/game/roundSetup";
+import type { GhostBotSpec } from "@/lib/sim/ghostReplay";
 import type { MarketOption } from "@/components/GameView";
 
 export type GameConfig =
-  | { kind: "synthetic"; seed: number; setup: RoundSetup }
-  | { kind: "historical"; id: string; label: string; candles: Candle[]; seed: number; setup: RoundSetup };
+  | { kind: "synthetic"; seed: number; setup: RoundSetup; ghost?: GhostBotSpec }
+  | { kind: "historical"; id: string; label: string; candles: Candle[]; seed: number; setup: RoundSetup; ghost?: GhostBotSpec };
 
 export interface TraderView {
   id: string;
@@ -123,19 +124,25 @@ function barDate(candles: Candle[], bar: number): string | undefined {
 
 function buildEngine(config: GameConfig): GameEngine {
   const playerElo = loadProfile().elo;
-  const bots = generateBots(config.seed, playerElo, 6);
+  const botCount = config.ghost ? 5 : 6;
+  const bots = generateBots(config.seed, playerElo, botCount);
   const tpb = config.setup.ticksPerBar;
+  const ghost = config.ghost;
   if (config.kind === "synthetic") {
     const r = new RNG((config.seed ^ 0x85ebca6b) >>> 0);
     const startPrice = Math.round(50 + r.next() * 4950);
     return new GameEngine(
       new Market({ ...DEFAULT_MARKET, seed: config.seed, startPrice, ticksPerBar: tpb }),
       bots,
+      {},
+      ghost,
     );
   }
   return new GameEngine(
     new HistoricalMarket(config.candles, config.label, { ticksPerBar: tpb, maxHistory: 600, warmup: 80 }, config.seed),
     bots,
+    {},
+    ghost,
   );
 }
 

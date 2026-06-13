@@ -43,6 +43,7 @@ export default function GameView({
   config,
   setup,
   markets,
+  replayBanner,
   onReplay,
   onRoundEnd,
   onContinue,
@@ -51,6 +52,7 @@ export default function GameView({
   config: GameConfig;
   setup: RoundSetup;
   markets: MarketOption[];
+  replayBanner?: string;
   onReplay: () => void;
   onRoundEnd?: (result: RoundResult) => void;
   onContinue?: () => void;
@@ -162,6 +164,11 @@ export default function GameView({
           <span className="rounded-md border border-slate-700/80 bg-slate-800/80 px-2 py-1 font-mono text-xs text-slate-300">
             {setup.timeframeLabel}
           </span>
+          {replayBanner && (
+            <span className="rounded-md border border-violet-500/40 bg-violet-500/10 px-2.5 py-1 text-xs font-medium text-violet-200">
+              {replayBanner}
+            </span>
+          )}
           <span className="hidden text-xs text-slate-500 sm:inline">
             bar {snapshot.bar}
             {snapshot.date ? ` · ${snapshot.date}` : ""}

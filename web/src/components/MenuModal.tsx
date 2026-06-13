@@ -105,8 +105,8 @@ export default function MenuModal({
           {tab === "community" && (
             <div className="space-y-4 text-sm">
               <p className="text-slate-400">
-                Browse anonymous solo rounds from other traders in the community gallery. Open any match to replay their
-                chart and deal list on a full page.
+                Browse anonymous solo rounds from other traders in the community gallery. Watch any match or play
+                alongside their recorded trades as the Peer trader bot.
               </p>
               <p className="text-slate-500">
                 Finish a solo round and yours is saved automatically. Filter by peers or your own runs.
