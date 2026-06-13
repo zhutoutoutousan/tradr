@@ -115,8 +115,19 @@ export default function CommunityMatchPage() {
               <span className="ml-2 rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-400">Your run</span>
             )}
           </p>
+          <p className="mt-2 text-sm text-violet-200/90">
+            Use <span className="font-semibold">Play alongside</span> to trade the same market while their recorded deals
+            replay as the <span className="font-semibold">Peer trader</span> bot.
+          </p>
         </div>
         <div className="flex gap-2">
+          <Link
+            href={`/community/${encodeURIComponent(id)}/play`}
+            data-testid="community-play-along"
+            className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold hover:bg-violet-500"
+          >
+            Play alongside
+          </Link>
           {!saved ? (
             <button
               data-testid="review-save"

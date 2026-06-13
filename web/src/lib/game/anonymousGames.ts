@@ -14,6 +14,7 @@ export interface CommunityGame {
   profit: number;
   trades: number;
   review: RoundReview;
+  setup: RoundSetup | null;
   isMine: boolean;
 }
 
@@ -28,6 +29,7 @@ export interface CommunityGameRow {
   profit: number;
   trades: number;
   review: Partial<RoundReview> | null;
+  setup?: RoundSetup | null;
 }
 
 /** Rebuild a full RoundReview from stored JSON + list-row stats (older/incomplete saves). */
@@ -84,6 +86,7 @@ export function mapCommunityGameRow(row: CommunityGameRow, deviceId: string): Co
   return {
     ...row,
     review: normalizeCommunityReview(row),
+    setup: row.setup ?? null,
     isMine: row.deviceId === deviceId,
   };
 }

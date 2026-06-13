@@ -9,7 +9,12 @@ import { supabase, supabaseEnabled } from "@/lib/supabase";
 import type { Candle, Side } from "@/lib/sim/types";
 import type { DanmakuItem } from "@/components/DanmakuOverlay";
 import { buildMultiplayerReview, mpRoundSetup, saveMultiplayerRound } from "@/lib/game/multiplayerRound";
-import { MP_LOBBY_CHANNEL, type MpRole } from "@/lib/multiplayer/lobby";
+import {
+  LOBBY_LISTING_EVENT,
+  lobbyChannelConfig,
+  MP_LOBBY_CHANNEL,
+  type MpRole,
+} from "@/lib/multiplayer/lobby";
 
 const MS_PER_TICK = 1000 / 9; // must match the synthetic feed's intended speed
 const COUNTDOWN_MS = 4000;
@@ -132,6 +137,7 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
   const joinedAtRef = useRef<number>(Date.now());
   const channelRef = useRef<RealtimeChannel | null>(null);
   const lobbyChannelRef = useRef<RealtimeChannel | null>(null);
+  const lobbyReadyRef = useRef(false);
   const startEpochRef = useRef<number | null>(null);
   const lastPushRef = useRef<number>(0);
   const presenceRef = useRef<Record<string, PresenceMeta>>({});
@@ -235,6 +241,26 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
   );
   applyInstrumentRef.current = applyInstrument;
 
+  const announceLobbyRoom = useCallback(() => {
+    const lobby = lobbyChannelRef.current;
+    if (!lobby || !lobbyReadyRef.current) return;
+
+    const flat = presenceRef.current;
+    let traders = 0;
+    let spectators = 0;
+    for (const meta of Object.values(flat)) {
+      if (meta?.role === "spectator") spectators += 1;
+      else traders += 1;
+    }
+    if (traders === 0 && roleRef.current !== "spectator") traders = 1;
+    if (traders < 1) return;
+
+    const code = room.toUpperCase();
+    const payload = { room: code, traders, spectators, at: Date.now() };
+    void lobby.track({ room: code, role: roleRef.current, traders, spectators });
+    void lobby.send({ type: "broadcast", event: LOBBY_LISTING_EVENT, payload });
+  }, [room]);
+
   // Connect to the realtime room.
   useEffect(() => {
     if (!supabaseEnabled || !supabase) {
@@ -245,7 +271,10 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
     const ch = sb.channel(`tradr-room:${room}`, {
       config: { presence: { key: myIdRef.current } },
     });
+    const lobby = sb.channel(MP_LOBBY_CHANNEL, lobbyChannelConfig(myIdRef.current));
     channelRef.current = ch;
+    lobbyChannelRef.current = lobby;
+    lobbyReadyRef.current = false;
 
     // Live equity / position of every player — high frequency, ephemeral.
     ch.on("broadcast", { event: "stats" }, ({ payload }) => {
@@ -376,6 +405,14 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
         startEpochRef.current = minStart;
         pushPresence({ startEpoch: minStart });
       }
+      announceLobbyRoom();
+    });
+
+    lobby.subscribe(async (status) => {
+      if (status === "SUBSCRIBED") {
+        lobbyReadyRef.current = true;
+        announceLobbyRoom();
+      }
     });
 
     ch.subscribe((status) => {
@@ -385,34 +422,17 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
       }
     });
 
+    const heartbeat = window.setInterval(announceLobbyRoom, 4000);
+
     return () => {
+      window.clearInterval(heartbeat);
+      lobbyReadyRef.current = false;
+      lobbyChannelRef.current = null;
       channelRef.current = null;
+      sb.removeChannel(lobby);
       sb.removeChannel(ch);
     };
-  }, [room, pushPresence]);
-
-  // Announce this session on the global lobby so others can browse open rooms.
-  useEffect(() => {
-    if (!supabaseEnabled || !supabase) return;
-    const sb = supabase;
-    const lobby = sb.channel(MP_LOBBY_CHANNEL, {
-      config: { presence: { key: myIdRef.current } },
-    });
-    lobbyChannelRef.current = lobby;
-
-    const trackLobby = () => {
-      lobby.track({ room: room.toUpperCase(), role: roleRef.current });
-    };
-
-    lobby.subscribe((status) => {
-      if (status === "SUBSCRIBED") trackLobby();
-    });
-
-    return () => {
-      lobbyChannelRef.current = null;
-      sb.removeChannel(lobby);
-    };
-  }, [room]);
+  }, [announceLobbyRoom, room, pushPresence]);
 
   // Game loop: deterministic, wall-clock synchronized across all clients.
   useEffect(() => {

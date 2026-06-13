@@ -97,7 +97,7 @@ export default function CommunityGallery() {
           <p className="text-xs font-medium uppercase tracking-widest text-slate-500">Peer matches</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-100 sm:text-3xl">Community gallery</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-400">
-            Browse anonymous solo rounds from other traders. Open any match to replay their chart and deal list.
+            Browse anonymous solo rounds from other traders. Watch their replay or play alongside their recorded trades as a bot.
           </p>
         </div>
         <div className="flex gap-1 rounded-lg border border-slate-800 bg-slate-950/60 p-1">
@@ -138,41 +138,57 @@ export default function CommunityGallery() {
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {filtered.map((g) => (
-              <Link
+              <div
                 key={g.id}
-                href={`/community/${encodeURIComponent(g.id)}`}
                 data-testid="gallery-card"
                 className="group flex flex-col rounded-xl border border-slate-800 bg-slate-900/50 p-4 transition hover:border-sky-500/40 hover:bg-slate-900"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h2 className="truncate font-semibold text-slate-100 group-hover:text-sky-200">{g.marketLabel}</h2>
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      {formatTimeAgo(g.createdAt)} · {g.mode}
-                    </p>
+                <Link href={`/community/${encodeURIComponent(g.id)}`} className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h2 className="truncate font-semibold text-slate-100 group-hover:text-sky-200">{g.marketLabel}</h2>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {formatTimeAgo(g.createdAt)} · {g.mode}
+                      </p>
+                    </div>
+                    {g.isMine && (
+                      <span className="shrink-0 rounded bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-400">
+                        You
+                      </span>
+                    )}
                   </div>
-                  {g.isMine && (
-                    <span className="shrink-0 rounded bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-400">
-                      You
-                    </span>
-                  )}
-                </div>
 
-                <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                  <Stat label="Rank" value={`#${g.rank}`} />
-                  <Stat
-                    label="Return"
-                    value={`${g.returnPct >= 0 ? "+" : ""}${g.returnPct.toFixed(1)}%`}
-                    up={g.returnPct >= 0}
-                  />
-                  <Stat label="Trades" value={`${g.trades}`} />
-                </div>
+                  <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                    <Stat label="Rank" value={`#${g.rank}`} />
+                    <Stat
+                      label="Return"
+                      value={`${g.returnPct >= 0 ? "+" : ""}${g.returnPct.toFixed(1)}%`}
+                      up={g.returnPct >= 0}
+                    />
+                    <Stat label="Trades" value={`${g.trades}`} />
+                  </div>
 
-                <div className="mt-3 flex items-center justify-between border-t border-slate-800/80 pt-3 text-xs">
-                  <span className={g.profit >= 0 ? "text-emerald-400" : "text-rose-400"}>{money(g.profit)} P&L</span>
-                  <span className="font-semibold text-sky-300 group-hover:text-sky-200">Watch replay →</span>
+                  <div className="mt-3 border-t border-slate-800/80 pt-3 text-xs">
+                    <span className={g.profit >= 0 ? "text-emerald-400" : "text-rose-400"}>{money(g.profit)} P&L</span>
+                  </div>
+                </Link>
+
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <Link
+                    href={`/community/${encodeURIComponent(g.id)}`}
+                    className="rounded-lg border border-slate-700 px-3 py-2 text-center text-xs font-semibold text-sky-300 hover:bg-slate-800"
+                  >
+                    Watch replay
+                  </Link>
+                  <Link
+                    href={`/community/${encodeURIComponent(g.id)}/play`}
+                    data-testid={`gallery-play-${g.id}`}
+                    className="rounded-lg bg-violet-600 px-3 py-2 text-center text-xs font-bold text-white hover:bg-violet-500"
+                  >
+                    Play alongside
+                  </Link>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
 
