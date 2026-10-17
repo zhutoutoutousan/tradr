@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { PWAProvider } from "@/components/PWAProvider";
 import { rootMetadata } from "@/lib/seo/metadata";
 import "./globals.css";
 
@@ -36,7 +37,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <JsonLd />
-        {children}
+        <PWAProvider>
+          {children}
+        </PWAProvider>
         <Analytics />
       </body>
     </html>
