@@ -194,10 +194,12 @@ function QRShareModal({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] bg-slate-950/95 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-[9999] bg-slate-950/95 backdrop-blur-sm"
       onClick={onClose}
     >
-      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div 
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-md max-h-[85vh] overflow-y-auto"
+      >
         <div
           className="relative w-full bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl"
           onClick={(e) => e.stopPropagation()}
@@ -320,7 +322,7 @@ function QRShareModal({
             </ul>
           </div>
         </div>
-      </div>
+        </div>
       </div>
     </div>
   );
