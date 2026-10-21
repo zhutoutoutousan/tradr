@@ -194,17 +194,18 @@ function QRShareModal({
 
   return (
     <div
-      className="fixed inset-0 z-[10000] bg-slate-950/95 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-[10000] bg-slate-950/95 backdrop-blur-sm"
       onClick={onClose}
     >
       <div 
-        className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl relative"
+        className="fixed top-1/2 left-1/2 w-[calc(100%-2rem)] max-w-md max-h-[90vh] overflow-y-auto bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl"
+        style={{ transform: 'translate(-50%, -50%) !important' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button */}
         <button
           onClick={onClose}
-          className="sticky top-4 left-full -mr-2 z-10 text-slate-400 hover:text-slate-200 transition-colors float-right"
+          className="absolute right-4 top-4 z-10 text-slate-400 hover:text-slate-200 transition-colors"
           aria-label="Close"
         >
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -213,7 +214,7 @@ function QRShareModal({
         </button>
 
         {/* Content */}
-        <div className="p-5 sm:p-6 space-y-5 sm:space-y-6 clear-both">
+        <div className="p-5 sm:p-6 space-y-5 sm:space-y-6">
           {/* Header */}
           <div className="text-center">
             <h2 className="text-xl font-bold text-slate-100">Share Room</h2>
