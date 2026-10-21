@@ -194,13 +194,14 @@ function QRShareModal({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/95 backdrop-blur-sm p-4 overflow-y-auto"
+      className="fixed inset-0 z-[9999] bg-slate-950/95 backdrop-blur-sm overflow-y-auto"
       onClick={onClose}
     >
-      <div
-        className="relative w-full max-w-md bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden my-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="min-h-full flex items-center justify-center p-4 py-8">
+        <div
+          className="relative w-full max-w-md bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Close button */}
         <button
           onClick={onClose}
@@ -213,7 +214,7 @@ function QRShareModal({
         </button>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-5 sm:p-6 space-y-5 sm:space-y-6">
           {/* Header */}
           <div className="text-center">
             <h2 className="text-xl font-bold text-slate-100">Share Room</h2>
@@ -222,8 +223,14 @@ function QRShareModal({
 
           {/* QR Code */}
           <div className="flex flex-col items-center space-y-3">
-            <div className="bg-white p-4 rounded-xl">
-              <QRCodeSVG id="qr-code-svg" value={url} size={200} level="M" />
+            <div className="bg-white p-3 sm:p-4 rounded-xl inline-block">
+              <QRCodeSVG 
+                id="qr-code-svg" 
+                value={url} 
+                size={180}
+                level="M" 
+                className="w-full h-auto max-w-[180px]"
+              />
             </div>
             <p className="text-xs text-slate-500 text-center">
               Scan with camera app to join instantly
@@ -313,6 +320,7 @@ function QRShareModal({
             </ul>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
