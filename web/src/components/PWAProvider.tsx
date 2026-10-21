@@ -65,7 +65,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
       )}
 
       {isUpdateAvailable && (
-        <div className="fixed top-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-blue-600 text-white px-4 py-3 rounded-lg shadow-lg z-50">
+        <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-blue-600 text-white px-4 py-3 rounded-lg shadow-lg z-50">
           <div className="flex items-center justify-between gap-3">
             <div className="flex-1">
               <div className="font-semibold">Update verfügbar</div>
@@ -82,7 +82,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
       )}
 
       {canInstall && !isStandalone && (
-        <div className="fixed top-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-slate-900 text-white px-4 py-3 rounded-lg shadow-lg z-50 border border-slate-700">
+        <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-slate-900 text-white px-4 py-3 rounded-lg shadow-lg z-50 border border-slate-700">
           <div className="flex items-center justify-between gap-3">
             <div className="flex-1">
               <div className="font-semibold">App installieren</div>
