@@ -56,7 +56,12 @@ export default function MultiplayerJoin({
             ← Back
           </button>
         )}
-        <h1 className="text-2xl font-bold">Multiplayer</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Multiplayer</h1>
+          <span className="rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-1 text-xs font-mono font-semibold text-emerald-400">
+            v2.0-qr-fix
+          </span>
+        </div>
         <p className="mt-1 text-sm text-slate-400">3-minute race on the same live market. Play or watch as observer.</p>
 
         <form onSubmit={join} className="mt-6 space-y-4">

@@ -26,7 +26,12 @@ export default function LandingIntro({
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <header className="border-b border-slate-800 bg-slate-900/80 px-4 py-4 backdrop-blur">
         <div className="mx-auto flex max-w-4xl items-center justify-between">
-          <span className="text-lg font-bold tracking-tight text-emerald-400">◆ Tradr</span>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold tracking-tight text-emerald-400">◆ Tradr</span>
+            <span className="rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-xs font-mono font-semibold text-emerald-400">
+              v2.0-qr-fix
+            </span>
+          </div>
           <div className="flex flex-wrap gap-2">
             <Link
               href="/community"
