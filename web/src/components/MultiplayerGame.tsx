@@ -5,6 +5,7 @@ import Link from "next/link";
 import CandleChart from "@/components/CandleChart";
 import DanmakuOverlay from "@/components/DanmakuOverlay";
 import RoomChat from "@/components/RoomChat";
+import RoomQRShare from "@/components/RoomQRShare";
 import ShareButtons from "@/components/ShareButtons";
 import { useMultiplayer, type MpRole } from "@/hooks/useMultiplayer";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -297,6 +298,7 @@ export default function MultiplayerGame({
           <button onClick={copyInvite} className="rounded-md bg-slate-800 px-3 py-1.5 text-sm hover:bg-slate-700">
             {copied ? "✓ Copied" : "Invite"}
           </button>
+          <RoomQRShare room={room} />
           <button onClick={onLeave} className="rounded-md bg-slate-800 px-3 py-1.5 text-sm hover:bg-slate-700">
             Leave
           </button>
