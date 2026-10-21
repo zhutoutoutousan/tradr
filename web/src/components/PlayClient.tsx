@@ -6,6 +6,7 @@ import TutorialModal from "@/components/TutorialModal";
 import LandingIntro from "@/components/LandingIntro";
 import ModeSelect, { type GameMode } from "@/components/ModeSelect";
 import MultiplayerJoin from "@/components/MultiplayerJoin";
+import { LocalMultiplayerMenu } from "@/components/local-multiplayer/LocalMultiplayerMenu";
 import type { GameConfig, RoundResult } from "@/hooks/useGame";
 import type { Candle } from "@/lib/sim/types";
 import { pickRoundSetup, type RoundSetup } from "@/lib/game/roundSetup";
@@ -135,6 +136,19 @@ export default function PlayClient() {
 
   if (gameMode === "multiplayer") {
     return <MultiplayerJoin onBack={backToMode} />;
+  }
+
+  if (gameMode === "local-multiplayer") {
+    return (
+      <LocalMultiplayerMenu
+        onStartGame={(isHost, remoteUsername) => {
+          console.log('[Local MP] Game starting', { isHost, remoteUsername });
+          // TODO: Implement local multiplayer game logic
+          // For now, just show a message
+        }}
+        onCancel={backToMode}
+      />
+    );
   }
 
   if (!ready || phase === "boot") {
