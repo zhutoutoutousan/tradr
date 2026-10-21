@@ -12,7 +12,7 @@ export const TIMEFRAMES: Record<TimeframeId, { label: string; ticksPerBar: numbe
   "1d": { label: "1D", ticksPerBar: 24 },
 };
 
-export type IndicatorKind = "sma" | "ema" | "rsi" | "macd" | "bollinger";
+export type IndicatorKind = "sma" | "ema" | "rsi" | "macd" | "bollinger" | "stochastic" | "adx" | "vwap";
 
 export interface ChartIndicator {
   kind: IndicatorKind;
@@ -35,6 +35,9 @@ const INDICATOR_DEFS: { kind: IndicatorKind; basePeriod: number; color: string; 
   { kind: "rsi", basePeriod: 14, color: "#22d3ee", name: "RSI" },
   { kind: "macd", basePeriod: 12, color: "#f472b6", name: "MACD" },
   { kind: "bollinger", basePeriod: 20, color: "#2dd4bf", name: "BB" },
+  { kind: "stochastic", basePeriod: 14, color: "#fb923c", name: "Stoch" },
+  { kind: "adx", basePeriod: 14, color: "#34d399", name: "ADX" },
+  { kind: "vwap", basePeriod: 20, color: "#c084fc", name: "VWAP" },
 ];
 
 const TF_IDS = Object.keys(TIMEFRAMES) as TimeframeId[];
