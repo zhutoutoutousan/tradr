@@ -1,6 +1,6 @@
-const CACHE_NAME = 'tradr-game-v2';
-const OFFLINE_CACHE = 'tradr-offline-v2';
-const DATA_CACHE = 'tradr-data-v2';
+const CACHE_NAME = 'tradr-game-v3';
+const OFFLINE_CACHE = 'tradr-offline-v3';
+const DATA_CACHE = 'tradr-data-v3';
 
 const STATIC_ASSETS = [
   '/',
