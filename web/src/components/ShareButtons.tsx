@@ -198,10 +198,10 @@ function QRShareModal({
       onClick={onClose}
     >
       <div 
-        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-md max-h-[85vh] overflow-y-auto"
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-md"
       >
         <div
-          className="relative w-full bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl"
+          className="relative w-full max-h-[85vh] overflow-y-auto bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
         {/* Close button */}
