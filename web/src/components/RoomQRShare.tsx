@@ -114,6 +114,7 @@ export default function RoomQRShare({ room, baseUrl }: RoomQRShareProps) {
         >
           <div
             className="relative w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
+            style={{ transform: 'translateY(50%)' }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close Button */}
