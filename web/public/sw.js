@@ -1,10 +1,11 @@
-const CACHE_NAME = 'tradr-game-v1';
-const OFFLINE_CACHE = 'tradr-offline-v1';
-const DATA_CACHE = 'tradr-data-v1';
+const CACHE_NAME = 'tradr-game-v2';
+const OFFLINE_CACHE = 'tradr-offline-v2';
+const DATA_CACHE = 'tradr-data-v2';
 
 const STATIC_ASSETS = [
   '/',
   '/play',
+  '/offline.html',
   '/manifest.json',
   '/favicon.svg',
   '/window.svg',
@@ -114,6 +115,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Handle page navigation requests
   if (url.pathname === '/' || 
       url.pathname === '/play' || 
       url.pathname === '/community' ||
@@ -121,30 +123,61 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseToCache);
-          });
+          // Cache successful responses
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseToCache);
+            });
+          }
           return response;
         })
         .catch(() => {
+          // Try cache first
           return caches.match(request).then((cachedResponse) => {
             if (cachedResponse) {
               return cachedResponse;
             }
-            return caches.match('/');
+            // If no cache, try root page
+            return caches.match('/').then((rootPage) => {
+              if (rootPage) {
+                return rootPage;
+              }
+              // Last resort: offline page
+              return caches.match('/offline.html');
+            });
           });
         })
     );
     return;
   }
 
+  // Default: Try network first, then cache, then offline page
   event.respondWith(
-    fetch(request).catch(() => {
-      return caches.match(request).then((cachedResponse) => {
-        return cachedResponse || caches.match('/');
-      });
-    })
+    fetch(request)
+      .then((response) => {
+        // Cache successful responses
+        if (response && response.status === 200 && request.method === 'GET') {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, responseToCache);
+          });
+        }
+        return response;
+      })
+      .catch(() => {
+        return caches.match(request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // If it's a navigation request and we have no cache, show offline page
+          if (request.mode === 'navigate') {
+            return caches.match('/offline.html');
+          }
+          // For other requests, just fail
+          return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+        });
+      })
   );
 });
 
