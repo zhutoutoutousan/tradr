@@ -36,7 +36,7 @@ const KIND_LABELS: Record<string, string> = {
 };
 
 // Bump on each deploy so a stale cached build is obvious on every device.
-const BUILD_TAG = "v2.7-pwa-banner-fix";
+const BUILD_TAG = "v2.8-sw-fix";
 
 export default function MultiplayerGame({
   room,

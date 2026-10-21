@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: "/((?!_next/static|_next/image).*)",
+        source: "/((?!_next/static|_next/image|sw\\.js|manifest\\.json).*)",
         headers: [{ key: "Cache-Control", value: "no-cache, must-revalidate" }],
       },
     ];
