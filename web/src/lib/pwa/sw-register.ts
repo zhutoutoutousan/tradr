@@ -32,8 +32,21 @@ class ServiceWorkerManager {
     }
 
     try {
+      // Check if SW file exists before registering
+      try {
+        const swCheck = await fetch('/sw.js', { method: 'HEAD', cache: 'no-cache' });
+        if (!swCheck.ok) {
+          console.error('[PWA] Service Worker file not found at /sw.js');
+          return null;
+        }
+      } catch (fetchError) {
+        console.error('[PWA] Cannot check Service Worker file:', fetchError);
+        return null;
+      }
+
       const registration = await navigator.serviceWorker.register('/sw.js', {
         scope: '/',
+        updateViaCache: 'none',
       });
 
       this.state.registration = registration;
