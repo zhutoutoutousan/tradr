@@ -29,6 +29,21 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        import('@/lib/pwa/sw-register').then(({ swManager }) => {
+          swManager.checkForUpdates();
+        });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   if (!mounted) {
     return <>{children}</>;
   }

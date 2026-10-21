@@ -1,5 +1,7 @@
 "use client";
 
+import React from 'react';
+
 export interface ServiceWorkerState {
   isSupported: boolean;
   isRegistered: boolean;
@@ -158,7 +160,13 @@ export function useServiceWorkerUpdate(): {
     return { isUpdateAvailable: false, skipWaiting: () => {} };
   }
 
-  const state = swManager.getState();
+  const [state, setState] = React.useState(swManager.getState());
+
+  React.useEffect(() => {
+    const unsubscribe = swManager.subscribe(setState);
+    return unsubscribe;
+  }, []);
+
   return {
     isUpdateAvailable: state.isUpdateAvailable,
     skipWaiting: () => swManager.skipWaiting(),
