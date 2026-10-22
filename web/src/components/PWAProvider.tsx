@@ -18,6 +18,16 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
   const offlineBanner = useSwipeDismiss();
   const updateBanner = useSwipeDismiss();
   const installBanner = useSwipeDismiss();
+  
+  // Stable update state to prevent flashing
+  const [stableUpdateAvailable, setStableUpdateAvailable] = useState(false);
+  
+  useEffect(() => {
+    if (isUpdateAvailable && !stableUpdateAvailable) {
+      console.log('[PWA] Update detected, locking state');
+      setStableUpdateAvailable(true);
+    }
+  }, [isUpdateAvailable, stableUpdateAvailable]);
 
   useEffect(() => {
     setMounted(true);
@@ -38,8 +48,21 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    let lastCheckTime = 0;
+    const MIN_CHECK_INTERVAL = 30000; // 30 seconds minimum between checks
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
+        const now = Date.now();
+        
+        // Throttle: Don't check if we checked recently
+        if (now - lastCheckTime < MIN_CHECK_INTERVAL) {
+          console.log('[PWA] Skipping update check (throttled)');
+          return;
+        }
+        
+        lastCheckTime = now;
+        
         import('@/lib/pwa/sw-register').then(({ swManager }) => {
           swManager.checkForUpdates();
         });
@@ -83,7 +106,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {isUpdateAvailable && !updateBanner.isDismissed && (
+      {stableUpdateAvailable && !updateBanner.isDismissed && (
         <div 
           className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-blue-600 text-white px-4 py-3 rounded-lg shadow-lg z-50 touch-pan-y"
           style={updateBanner.style}
@@ -95,13 +118,19 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
               <div className="text-sm opacity-90">Neue Version der App ist bereit</div>
             </div>
             <button
-              onClick={skipWaiting}
+              onClick={() => {
+                skipWaiting();
+                setStableUpdateAvailable(false);
+              }}
               className="px-3 py-1.5 bg-white text-blue-600 rounded font-semibold text-sm hover:bg-blue-50 transition-colors"
             >
               Aktualisieren
             </button>
             <button
-              onClick={updateBanner.dismiss}
+              onClick={() => {
+                updateBanner.dismiss();
+                setStableUpdateAvailable(false);
+              }}
               className="ml-2 text-white/70 hover:text-white transition-colors hidden md:block"
               aria-label="Schließen"
             >
