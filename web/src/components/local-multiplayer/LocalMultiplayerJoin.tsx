@@ -41,14 +41,35 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
 
   const startScanning = async () => {
     try {
+      // iOS requires explicit camera permission request
+      console.log('[LocalMP Join] Requesting camera access...');
+      
+      // Try to access camera first to trigger permission dialog
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' } 
+        });
+        console.log('[LocalMP Join] Camera permission granted');
+        // Stop the test stream
+        stream.getTracks().forEach(track => track.stop());
+      } catch (permErr: any) {
+        console.error('[LocalMP Join] Permission denied:', permErr);
+        setCameraPermission(false);
+        setError('Kamera-Zugriff verweigert. Bitte erlaube den Zugriff in deinen Browser-Einstellungen und lade die Seite neu.');
+        return;
+      }
+
+      // Now start the QR scanner
       const scanner = new Html5Qrcode('qr-reader');
       scannerRef.current = scanner;
 
+      // iOS-compatible configuration
       await scanner.start(
         { facingMode: 'environment' },
         {
           fps: 10,
-          qrbox: { width: 250, height: 250 }
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0, // iOS likes square aspect ratio
         },
         async (decodedText) => {
           console.log('[LocalMP Join] QR code scanned');
@@ -56,7 +77,7 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
           stopScanning();
         },
         (errorMessage) => {
-          // Ignore scanning errors (happens frequently)
+          // Ignore frequent scanning errors
         }
       );
 
@@ -68,8 +89,12 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         setCameraPermission(false);
         setError('Kamera-Zugriff verweigert. Bitte erlaube den Zugriff oder nutze manuelle Eingabe.');
+      } else if (err.name === 'NotFoundError') {
+        setError('Keine Kamera gefunden. Nutze bitte manuelle Eingabe.');
+      } else if (err.name === 'NotReadableError') {
+        setError('Kamera wird bereits verwendet. Schließe andere Apps und versuche es erneut.');
       } else {
-        setError('Kamera konnte nicht gestartet werden');
+        setError(`Kamera-Fehler: ${err.message || 'Unbekannter Fehler'}. Nutze bitte manuelle Eingabe.`);
       }
     }
   };
@@ -236,23 +261,42 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
                 <p className="text-slate-300 mb-4">
                   Kamera wird benötigt um QR-Code zu scannen
                 </p>
+                
+                {/* iOS specific instructions */}
+                <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded text-left">
+                  <p className="text-xs font-semibold text-blue-300 mb-2">📱 iOS Nutzer:</p>
+                  <ul className="text-xs text-slate-400 space-y-1">
+                    <li>• Erlaube Kamera-Zugriff wenn gefragt</li>
+                    <li>• Falls blockiert: Safari Einstellungen → Kamera</li>
+                    <li>• Oder nutze "⌨️ Manuell" Modus</li>
+                  </ul>
+                </div>
+                
                 {cameraPermission === false && (
-                  <p className="text-sm text-red-400 mb-4">
-                    Kamera-Zugriff wurde verweigert. Bitte erlaube den Zugriff in deinen Browser-Einstellungen.
-                  </p>
+                  <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded">
+                    <p className="text-sm text-red-400 mb-2">
+                      ❌ Kamera-Zugriff wurde verweigert
+                    </p>
+                    <p className="text-xs text-red-300">
+                      Lösung: Nutze den "⌨️ Manuell" Modus oder erlaube Kamera-Zugriff in den Einstellungen.
+                    </p>
+                  </div>
                 )}
+                
                 <button
                   onClick={startScanning}
                   disabled={loading}
                   className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-700 text-white font-semibold rounded-lg transition-colors"
                 >
-                  Kamera starten
+                  📷 Kamera starten
                 </button>
               </div>
             </div>
           ) : (
             <div className="space-y-4">
-              <div id="qr-reader" className="rounded-lg overflow-hidden border-4 border-emerald-500" />
+              <div className="bg-slate-900 rounded-lg p-2">
+                <div id="qr-reader" className="rounded-lg overflow-hidden" style={{ minHeight: '300px' }} />
+              </div>
               <button
                 onClick={stopScanning}
                 className="w-full py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors"
