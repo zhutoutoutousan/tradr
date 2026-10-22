@@ -23,6 +23,7 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
   const [shouldStartScanner, setShouldStartScanner] = useState(false);
+  const qrReaderRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const unsubscribe = webrtcManager.onStateChange((state) => {
@@ -88,13 +89,18 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
           }
         }
 
-        // Wait a bit to ensure DOM is ready
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Wait for DOM using multiple strategies
+        let element = document.getElementById('qr-reader');
+        let retries = 0;
+        while (!element && retries < 20) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+          element = document.getElementById('qr-reader');
+          retries++;
+          console.log(`[LocalMP Join] Waiting for qr-reader element... retry ${retries}`);
+        }
 
-        // Check if element exists
-        const element = document.getElementById('qr-reader');
         if (!element) {
-          console.error('[LocalMP Join] qr-reader element not found in DOM');
+          console.error('[LocalMP Join] qr-reader element not found after retries');
           setError('❌ Scanner konnte nicht initialisiert werden. Nutze "⌨️ Manuell" Modus.');
           setShouldStartScanner(false);
           return;

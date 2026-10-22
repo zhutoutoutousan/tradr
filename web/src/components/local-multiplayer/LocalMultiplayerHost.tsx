@@ -23,6 +23,7 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
   const [manualMode, setManualMode] = useState(false);
   const [shouldStartAnswerScanner, setShouldStartAnswerScanner] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const answerQrReaderRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     async function createOffer() {
@@ -100,12 +101,18 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
           }
         }
 
-        // Wait for DOM
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Wait for DOM with retries
+        let element = document.getElementById('answer-qr-reader');
+        let retries = 0;
+        while (!element && retries < 20) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+          element = document.getElementById('answer-qr-reader');
+          retries++;
+          console.log(`[LocalMP Host] Waiting for answer-qr-reader element... retry ${retries}`);
+        }
 
-        const element = document.getElementById('answer-qr-reader');
         if (!element) {
-          console.error('[LocalMP Host] answer-qr-reader element not found in DOM');
+          console.error('[LocalMP Host] answer-qr-reader element not found after retries');
           setError('❌ Scanner konnte nicht initialisiert werden. Nutze "⌨️ Manuell" Modus.');
           setShouldStartAnswerScanner(false);
           return;
