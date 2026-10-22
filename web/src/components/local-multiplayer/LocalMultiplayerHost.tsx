@@ -57,19 +57,43 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
   }, [username, onConnected]);
 
   const startScanningAnswer = async () => {
+    setError('');
+    
     try {
       console.log('[LocalMP Host] Starting Answer QR scanner...');
+      
+      // Check if mediaDevices is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera API not supported on this browser');
+      }
       
       // Request camera permission first (iOS compatibility)
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'environment' } 
+          video: { 
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          } 
         });
+        console.log('[LocalMP Host] Camera permission granted');
         stream.getTracks().forEach(track => track.stop());
-      } catch (permErr) {
-        console.error('[LocalMP Host] Camera permission denied:', permErr);
-        setError('Kamera-Zugriff verweigert. Nutze manuelle Eingabe.');
-        return;
+      } catch (permErr: any) {
+        console.error('[LocalMP Host] Camera permission error:', permErr);
+        
+        if (permErr.name === 'NotAllowedError') {
+          setError('❌ Kamera-Zugriff verweigert. Tippe auf "Erlauben" wenn Safari fragt.');
+          return;
+        } else if (permErr.name === 'NotFoundError') {
+          setError('❌ Keine Kamera gefunden. Nutze "⌨️ Manuell" Modus.');
+          return;
+        } else if (permErr.name === 'NotReadableError') {
+          setError('❌ Kamera blockiert. Schließe andere Kamera-Apps.');
+          return;
+        } else {
+          setError(`❌ Kamera-Fehler: ${permErr.message || permErr.name}. Nutze manuelle Eingabe.`);
+          return;
+        }
       }
 
       const scanner = new Html5Qrcode('answer-qr-reader');
@@ -83,21 +107,35 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
           aspectRatio: 1.0,
         },
         async (decodedText) => {
-          console.log('[LocalMP Host] Answer QR scanned');
+          console.log('[LocalMP Host] Answer QR scanned successfully');
           setAnswerInput(decodedText);
           await handleAnswerCode(decodedText);
           stopScanningAnswer();
         },
         (errorMessage) => {
-          // Ignore scanning errors
+          // Ignore scanning errors (not finding QR codes)
         }
       );
 
       setScanningAnswer(true);
       setError('');
+      console.log('[LocalMP Host] Answer scanner started successfully');
+      
     } catch (err: any) {
-      console.error('[LocalMP Host] Answer scanner error:', err);
-      setError('Kamera konnte nicht gestartet werden. Nutze manuelle Eingabe.');
+      console.error('[LocalMP Host] Answer scanner initialization failed:', err);
+      
+      const errorName = err.name || 'Unknown';
+      const errorMsg = err.message || 'Unbekannter Fehler';
+      
+      if (errorName === 'NotAllowedError') {
+        setError('❌ Kamera-Zugriff blockiert. Safari-Einstellungen → Kamera → Erlauben.');
+      } else if (errorName === 'NotFoundError' || errorMsg.includes('camera')) {
+        setError('❌ Keine Kamera verfügbar. Nutze "⌨️ Manuell" Modus.');
+      } else if (errorName === 'NotReadableError' || errorMsg.includes('use')) {
+        setError('❌ Kamera bereits in Verwendung. Schließe andere Apps.');
+      } else {
+        setError(`❌ Scanner-Fehler: ${errorMsg}. Nutze manuelle Eingabe.`);
+      }
     }
   };
 

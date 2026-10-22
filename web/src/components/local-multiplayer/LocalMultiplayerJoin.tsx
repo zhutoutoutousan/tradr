@@ -41,26 +41,51 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
   }, [onConnected]);
 
   const startScanning = async () => {
+    setError('');
+    
     try {
-      // iOS requires explicit camera permission request
       console.log('[LocalMP Join] Requesting camera access...');
       
-      // Try to access camera first to trigger permission dialog
+      // Check if mediaDevices is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera API not supported on this browser');
+      }
+      
+      // iOS requires explicit camera permission request
+      let stream;
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'environment' } 
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          } 
         });
         console.log('[LocalMP Join] Camera permission granted');
         // Stop the test stream
         stream.getTracks().forEach(track => track.stop());
       } catch (permErr: any) {
-        console.error('[LocalMP Join] Permission denied:', permErr);
+        console.error('[LocalMP Join] Permission error:', permErr);
         setCameraPermission(false);
-        setError('Kamera-Zugriff verweigert. Bitte erlaube den Zugriff in deinen Browser-Einstellungen und lade die Seite neu.');
-        return;
+        
+        // Specific error messages
+        if (permErr.name === 'NotAllowedError') {
+          setError('Kamera-Zugriff verweigert. Tippe auf "Erlauben" wenn Safari nach Erlaubnis fragt.');
+          return;
+        } else if (permErr.name === 'NotFoundError') {
+          setError('Keine Kamera gefunden. Dein Gerät hat keine Kamera oder sie ist deaktiviert.');
+          return;
+        } else if (permErr.name === 'NotReadableError') {
+          setError('Kamera ist blockiert oder wird von einer anderen App verwendet. Schließe andere Kamera-Apps.');
+          return;
+        } else {
+          setError(`Kamera-Zugriff fehlgeschlagen: ${permErr.message || permErr.name}. Nutze "⌨️ Manuell" Modus.`);
+          return;
+        }
       }
 
       // Now start the QR scanner
+      console.log('[LocalMP Join] Starting QR scanner...');
       const scanner = new Html5Qrcode('qr-reader');
       scannerRef.current = scanner;
 
@@ -70,32 +95,41 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
         {
           fps: 10,
           qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0, // iOS likes square aspect ratio
+          aspectRatio: 1.0,
         },
         async (decodedText) => {
-          console.log('[LocalMP Join] QR code scanned');
+          console.log('[LocalMP Join] QR code scanned successfully');
           await handleOfferCode(decodedText);
           stopScanning();
         },
         (errorMessage) => {
-          // Ignore frequent scanning errors
+          // Ignore frequent scanning errors (not finding QR codes)
         }
       );
 
       setScanning(true);
       setCameraPermission(true);
       setError('');
+      console.log('[LocalMP Join] Scanner started successfully');
+      
     } catch (err: any) {
-      console.error('[LocalMP Join] Camera error:', err);
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      console.error('[LocalMP Join] Scanner initialization failed:', err);
+      
+      // Detailed error messages
+      const errorName = err.name || 'Unknown';
+      const errorMsg = err.message || 'Unbekannter Fehler';
+      
+      if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError') {
         setCameraPermission(false);
-        setError('Kamera-Zugriff verweigert. Bitte erlaube den Zugriff oder nutze manuelle Eingabe.');
-      } else if (err.name === 'NotFoundError') {
-        setError('Keine Kamera gefunden. Nutze bitte manuelle Eingabe.');
-      } else if (err.name === 'NotReadableError') {
-        setError('Kamera wird bereits verwendet. Schließe andere Apps und versuche es erneut.');
+        setError('❌ Kamera-Zugriff wurde blockiert. Bitte in Safari-Einstellungen → Kamera → Erlauben.');
+      } else if (errorName === 'NotFoundError' || errorMsg.includes('camera')) {
+        setError('❌ Keine Kamera verfügbar. Nutze bitte "⌨️ Manuell" Modus.');
+      } else if (errorName === 'NotReadableError' || errorMsg.includes('use')) {
+        setError('❌ Kamera wird bereits verwendet. Schließe andere Apps (Instagram, Snapchat, etc.).');
+      } else if (errorMsg.includes('HTTPS') || errorMsg.includes('secure')) {
+        setError('❌ Kamera benötigt HTTPS. Lade die Seite über https:// neu.');
       } else {
-        setError(`Kamera-Fehler: ${err.message || 'Unbekannter Fehler'}. Nutze bitte manuelle Eingabe.`);
+        setError(`❌ Scanner-Fehler (${errorName}): ${errorMsg}. Bitte nutze "⌨️ Manuell" Modus.`);
       }
     }
   };
