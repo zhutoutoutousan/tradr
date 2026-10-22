@@ -117,6 +117,37 @@ class AuthService {
     }
   }
 
+  async signInWithOAuth(provider: 'github' | 'google'): Promise<AuthResult> {
+    if (!supabase) {
+      return {
+        user: null,
+        session: null,
+        error: { message: 'Supabase not configured', name: 'ConfigError', status: 500 } as AuthError
+      };
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`
+        }
+      });
+
+      if (error) return { user: null, session: null, error };
+      
+      // OAuth redirects, so return pending state
+      return { user: null, session: null, error: null };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      return {
+        user: null,
+        session: null,
+        error: { message: errorMessage, name: 'OAuthError', status: 500 } as AuthError
+      };
+    }
+  }
+
   async signOut(): Promise<{ error: AuthError | null }> {
     if (!supabase) {
       return { error: { message: 'Supabase not configured', name: 'ConfigError', status: 500 } as AuthError };
