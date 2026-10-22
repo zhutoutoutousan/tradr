@@ -189,7 +189,7 @@ export default function PlayClient() {
   }
 
   const waiting = gameMode === "solo" && (!config || loading);
-  if (waiting) {
+  if (waiting || !config || !setup) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-slate-950 text-slate-400">
         Rolling random market setup…
@@ -197,7 +197,7 @@ export default function PlayClient() {
     );
   }
 
-  const key = config!.kind === "synthetic" ? `syn-${seed}` : `hist-${config!.id}-${seed}`;
+  const key = config.kind === "synthetic" ? `syn-${seed}` : `hist-${config.id}-${seed}`;
 
   if (phase === "tutorial") {
     return <TutorialModal onStart={finishTutorial} />;

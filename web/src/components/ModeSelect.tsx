@@ -98,7 +98,7 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
       <p className="col-span-full px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center text-xs text-slate-600">
         ◆ Tradr — tap a mode to start
         <span className="ml-2 rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-500/80">
-          v3.0-challenge-mode
+          v3.0.2-sw-fix
         </span>
       </p>
     </div>

@@ -32,18 +32,30 @@ class ServiceWorkerManager {
     }
 
     try {
-      // Check if SW file exists before registering
+      // STEP 1: Unregister ALL old service workers first (clean slate)
+      const existingRegistrations = await navigator.serviceWorker.getRegistrations();
+      if (existingRegistrations.length > 0) {
+        console.log(`[PWA] Found ${existingRegistrations.length} existing Service Worker(s), unregistering...`);
+        for (const reg of existingRegistrations) {
+          await reg.unregister();
+          console.log('[PWA] Unregistered old Service Worker:', reg.scope);
+        }
+      }
+
+      // STEP 2: Check if SW file exists before registering
       try {
         const swCheck = await fetch('/sw.js', { method: 'HEAD', cache: 'no-cache' });
         if (!swCheck.ok) {
-          console.error('[PWA] Service Worker file not found at /sw.js');
+          console.error('[PWA] Service Worker file not found at /sw.js (status:', swCheck.status, ')');
           return null;
         }
+        console.log('[PWA] Service Worker file exists, proceeding with registration');
       } catch (fetchError) {
         console.error('[PWA] Cannot check Service Worker file:', fetchError);
         return null;
       }
 
+      // STEP 3: Register new Service Worker
       const registration = await navigator.serviceWorker.register('/sw.js', {
         scope: '/',
         updateViaCache: 'none',
@@ -53,7 +65,7 @@ class ServiceWorkerManager {
       this.state.isRegistered = true;
       this.notifyListeners();
 
-      console.log('[PWA] Service Worker registered:', registration);
+      console.log('[PWA] Service Worker registered successfully:', registration);
 
       registration.addEventListener('updatefound', () => {
         const newWorker = registration.installing;
@@ -75,11 +87,26 @@ class ServiceWorkerManager {
         window.location.reload();
       });
 
-      await registration.update();
+      // STEP 4: Check for updates (but don't fail if this errors)
+      try {
+        await registration.update();
+      } catch (updateError) {
+        console.warn('[PWA] Initial update check failed (non-critical):', updateError);
+      }
 
       return registration;
     } catch (error) {
       console.error('[PWA] Service Worker registration failed:', error);
+      // If registration fails, try to clean up any partial state
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const reg of registrations) {
+          await reg.unregister();
+        }
+        console.log('[PWA] Cleaned up failed registration attempt');
+      } catch (cleanupError) {
+        console.error('[PWA] Cleanup also failed:', cleanupError);
+      }
       return null;
     }
   }
