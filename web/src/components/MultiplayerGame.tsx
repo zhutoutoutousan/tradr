@@ -36,7 +36,7 @@ const KIND_LABELS: Record<string, string> = {
 };
 
 // Bump on each deploy so a stale cached build is obvious on every device.
-const BUILD_TAG = "v2.12-qr-zindex-fix";
+const BUILD_TAG = "v2.13-qr-zindex-final";
 
 export default function MultiplayerGame({
   room,
@@ -665,7 +665,7 @@ function miniName(name: string, isBot: boolean) {
 
 function MiniRaceLeaderboard({ rows }: { rows: LeaderboardRow[] }) {
   return (
-    <div className="pointer-events-none absolute top-1 right-1 z-10 w-[6.75rem] rounded border border-slate-700/70 bg-slate-950/80 px-1 py-0.5 text-[7px] leading-[1.35] shadow-md backdrop-blur-sm">
+    <div className="pointer-events-none absolute top-1 right-1 z-0 w-[6.75rem] rounded border border-slate-700/70 bg-slate-950/80 px-1 py-0.5 text-[7px] leading-[1.35] shadow-md backdrop-blur-sm">
       {rows.map((r, i) => (
         <div
           key={r.id}
