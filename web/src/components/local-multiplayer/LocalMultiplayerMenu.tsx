@@ -130,16 +130,34 @@ export function LocalMultiplayerMenu({ onStartGame, onCancel }: LocalMultiplayer
       <h1 className="text-3xl font-bold text-white mb-2 text-center">
         Lokales Multiplayer
       </h1>
-      <p className="text-slate-400 mb-8 text-center max-w-md">
-        Spiele mit jemandem in deiner Nähe - komplett offline!
+      <p className="text-slate-400 mb-6 text-center max-w-md">
+        Spiele mit jemandem in deiner Nähe über lokales Netzwerk
       </p>
+
+      {/* Network Requirements - IMPORTANT */}
+      <div className="bg-amber-500/10 border-2 border-amber-500/50 rounded-lg p-4 mb-6 w-full max-w-md">
+        <div className="flex items-start gap-3">
+          <span className="text-2xl">⚠️</span>
+          <div>
+            <p className="font-semibold text-amber-300 mb-2">Netzwerk erforderlich:</p>
+            <ul className="text-sm text-amber-100 space-y-1">
+              <li>✅ Beide im selben WiFi (zu Hause, Café)</li>
+              <li>✅ Oder: Ein Handy macht Hotspot</li>
+              <li>✅ Oder: Beide haben mobile Daten</li>
+            </ul>
+            <p className="text-xs text-amber-200 mt-2 font-semibold">
+              ✈️ Flugzeug-Tipp: Ein Handy öffnet Hotspot, anderes verbindet sich!
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Feature Highlights */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 w-full max-w-2xl">
         <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700 text-center">
-          <div className="text-3xl mb-2">🔌</div>
-          <div className="font-semibold text-white mb-1">Komplett Offline</div>
-          <div className="text-sm text-slate-400">Kein Internet nötig</div>
+          <div className="text-3xl mb-2">🏠</div>
+          <div className="font-semibold text-white mb-1">Lokales Netzwerk</div>
+          <div className="text-sm text-slate-400">Gleiche WiFi oder Hotspot</div>
         </div>
         
         <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700 text-center">
@@ -149,9 +167,9 @@ export function LocalMultiplayerMenu({ onStartGame, onCancel }: LocalMultiplayer
         </div>
         
         <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700 text-center">
-          <div className="text-3xl mb-2">✈️</div>
-          <div className="font-semibold text-white mb-1">Flugzeug-Modus</div>
-          <div className="text-sm text-slate-400">Perfekt fürs Reisen</div>
+          <div className="text-3xl mb-2">📶</div>
+          <div className="font-semibold text-white mb-1">Kein Internet</div>
+          <div className="text-sm text-slate-400">Nur lokale Verbindung</div>
         </div>
       </div>
 
@@ -205,7 +223,7 @@ export function LocalMultiplayerMenu({ onStartGame, onCancel }: LocalMultiplayer
           <div className="flex items-start gap-3">
             <span className="text-lg">4️⃣</span>
             <div>
-              <span className="font-semibold text-white">Spielen!</span> Komplett offline möglich
+              <span className="font-semibold text-white">Spielen!</span> Über lokales Netzwerk (kein Internet nötig)
             </div>
           </div>
         </div>
@@ -215,13 +233,13 @@ export function LocalMultiplayerMenu({ onStartGame, onCancel }: LocalMultiplayer
       <div className="text-center text-sm text-slate-400 mb-6">
         <div className="font-semibold text-white mb-2">Perfekt für:</div>
         <div className="space-x-2">
-          <span>✈️ Flugzeug</span>
+          <span>✈️ Flugzeug (mit Hotspot)</span>
           <span>•</span>
-          <span>🚂 Zug</span>
+          <span>🏠 Zuhause (WiFi)</span>
           <span>•</span>
-          <span>🏕️ Camping</span>
+          <span>☕ Café (WiFi)</span>
           <span>•</span>
-          <span>🏢 Office</span>
+          <span>🏢 Büro</span>
         </div>
       </div>
 

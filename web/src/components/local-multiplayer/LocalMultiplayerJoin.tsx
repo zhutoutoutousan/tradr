@@ -164,7 +164,7 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
           ✅ Antwort-Code erstellt
         </h2>
         <p className="text-slate-400 mb-6 text-center">
-          Zeige diesen QR-Code dem Host (飞行模式可用！✈️)
+          Zeige diesen QR-Code dem Host
         </p>
 
         {/* Answer QR Code - Main Feature for Airplane Mode */}
@@ -177,17 +177,20 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
           />
         </div>
 
-        {/* Airplane Mode Instructions */}
-        <div className="bg-emerald-500/10 border border-emerald-500/50 rounded-lg p-4 mb-6 w-full max-w-md">
+        {/* Network Instructions */}
+        <div className="bg-blue-500/10 border border-blue-500/50 rounded-lg p-4 mb-6 w-full max-w-md">
           <div className="flex items-start gap-3">
-            <span className="text-2xl">✈️</span>
+            <span className="text-2xl">📡</span>
             <div>
-              <p className="font-semibold text-emerald-300 mb-2">Flugmodus / Offline:</p>
+              <p className="font-semibold text-blue-300 mb-2">Nächster Schritt:</p>
               <ol className="text-sm text-slate-300 space-y-1 list-decimal list-inside">
                 <li>Host scannt <strong>diesen QR-Code</strong></li>
-                <li>Verbindung wird hergestellt!</li>
-                <li>Kein Internet nötig! 🎮</li>
+                <li>Verbindung wird hergestellt</li>
+                <li>Spiel startet! 🎮</li>
               </ol>
+              <p className="text-xs text-blue-200 mt-2">
+                💡 Tipp: Stelle sicher, dass beide Geräte im gleichen Netzwerk sind
+              </p>
             </div>
           </div>
         </div>

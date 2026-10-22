@@ -210,14 +210,14 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
           {/* Step 2 Instructions */}
           <div className="bg-blue-500/10 border border-blue-500/50 rounded-lg p-4 mb-6">
             <div className="flex items-start gap-3">
-              <span className="text-2xl">✈️</span>
+              <span className="text-2xl">📷</span>
               <div>
                 <p className="font-semibold text-white mb-2">Schritt 2: Antwort empfangen</p>
                 <p className="text-sm text-slate-300 mb-2">
                   Dein Mitspieler zeigt jetzt einen neuen QR-Code.
                 </p>
-                <p className="text-sm text-amber-300">
-                  📷 Scanne seinen Antwort-QR-Code oder gib den Code manuell ein.
+                <p className="text-sm text-blue-300">
+                  Scanne seinen Antwort-QR-Code oder gib den Code manuell ein.
                 </p>
               </div>
             </div>
