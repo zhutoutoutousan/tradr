@@ -36,7 +36,7 @@ const KIND_LABELS: Record<string, string> = {
 };
 
 // Bump on each deploy so a stale cached build is obvious on every device.
-const BUILD_TAG = "v3.2.1-pwa-airplane";
+const BUILD_TAG = "v3.3.0-early-supporter";
 
 export default function MultiplayerGame({
   room,

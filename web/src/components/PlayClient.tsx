@@ -7,12 +7,15 @@ import LandingIntro from "@/components/LandingIntro";
 import ModeSelect, { type GameMode } from "@/components/ModeSelect";
 import MultiplayerJoin from "@/components/MultiplayerJoin";
 import { LocalMultiplayerMenu } from "@/components/local-multiplayer/LocalMultiplayerMenu";
+import SuggestRegisterModal from "@/components/SuggestRegisterModal";
 import type { GameConfig, RoundResult } from "@/hooks/useGame";
 import type { Candle } from "@/lib/sim/types";
 import { pickRoundSetup, type RoundSetup } from "@/lib/game/roundSetup";
 import { saveAnonymousGame } from "@/lib/game/anonymousGames";
+import { authService } from "@/lib/auth/supabase-auth";
 
 const TUTORIAL_KEY = "tradr.tutorial.v1";
+const SUGGEST_REGISTER_KEY = "tradr.suggest-register-shown";
 
 interface Dataset {
   id: string;
@@ -39,11 +42,29 @@ export default function PlayClient() {
   const [error, setError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<RoundResult | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showSuggestRegister, setShowSuggestRegister] = useState(false);
+  const [isGuest, setIsGuest] = useState(true);
 
   useEffect(() => {
     setSeed(newSeed());
     setReady(true);
     setPhase("mode");
+  }, []);
+
+  // Check if user is logged in
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { session } = await authService.getSession();
+      setIsGuest(!session);
+    };
+    checkAuth();
+
+    // Listen for auth changes
+    const unsubscribe = authService.onAuthStateChange((user) => {
+      setIsGuest(!user);
+    });
+
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -126,8 +147,20 @@ export default function PlayClient() {
           console.warn("community save failed", err);
         });
       }
+      
+      // Show register suggestion for guests (only once)
+      if (isGuest && gameMode === "solo") {
+        const shown = localStorage.getItem(SUGGEST_REGISTER_KEY);
+        if (!shown) {
+          // Show after a short delay (let user see the results first)
+          setTimeout(() => {
+            setShowSuggestRegister(true);
+            localStorage.setItem(SUGGEST_REGISTER_KEY, "1");
+          }, 2000);
+        }
+      }
     },
-    [setup],
+    [setup, isGuest, gameMode],
   );
 
   const handleContinue = useCallback(() => {
@@ -180,6 +213,10 @@ export default function PlayClient() {
     return (
       <>
         {showTutorial && <TutorialModal onStart={() => setShowTutorial(false)} />}
+        <SuggestRegisterModal 
+          isOpen={showSuggestRegister} 
+          onClose={() => setShowSuggestRegister(false)} 
+        />
         <LandingIntro
           result={lastResult}
           onPlayAgain={handleReplay}
