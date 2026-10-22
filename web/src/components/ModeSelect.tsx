@@ -40,8 +40,8 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
     <div
       className={
         isMobile
-          ? "grid min-h-[100dvh] w-full grid-rows-[1fr_1fr_1fr_1fr_auto] bg-slate-950 text-slate-100"
-          : "grid min-h-[100dvh] w-full grid-cols-2 grid-rows-[1fr_1fr_auto] bg-slate-950 text-slate-100"
+          ? "grid min-h-[100dvh] w-full grid-rows-[repeat(5,1fr)_auto] bg-slate-950 text-slate-100"
+          : "grid min-h-[100dvh] w-full grid-cols-3 grid-rows-[1fr_1fr_auto] bg-slate-950 text-slate-100"
       }
     >
       <ClearSWButton />
@@ -70,7 +70,7 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
         data-testid="mode-challenge"
         onClick={() => onPick("challenge")}
         className={`group flex flex-col items-center justify-center gap-4 p-6 text-center transition active:bg-slate-900 sm:p-8 ${
-          isMobile ? "border-b border-slate-800" : "border-b border-slate-800"
+          isMobile ? "border-b border-slate-800" : "border-r border-b border-slate-800"
         }`}
       >
         <div className="text-5xl">🏆</div>
@@ -90,7 +90,7 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
         data-testid="mode-multiplayer"
         onClick={() => onPick("multiplayer")}
         className={`group flex flex-col items-center justify-center gap-4 p-6 text-center transition active:bg-slate-900 sm:p-8 ${
-          isMobile ? "border-b border-slate-800" : "border-r border-slate-800"
+          isMobile ? "border-b border-slate-800" : "border-b border-slate-800"
         }`}
       >
         <div className="text-5xl">⚔️</div>
@@ -110,7 +110,7 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
         data-testid="mode-local-multiplayer"
         onClick={() => onPick("local-multiplayer")}
         className={`group flex flex-col items-center justify-center gap-4 p-6 text-center transition active:bg-slate-900 sm:p-8 ${
-          isMobile ? "" : ""
+          isMobile ? "border-b border-slate-800" : "border-r border-slate-800"
         }`}
       >
         <div className="text-5xl">✈️</div>
@@ -125,41 +125,64 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
         </span>
       </button>
 
-      <div className="col-span-full px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <div className="flex items-center justify-between max-w-4xl mx-auto">
-          <p className="text-xs text-slate-600">
-            ◆ Tradr — tap a mode to start
-            <span className="ml-2 rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-500/80">
-              v3.6.0-profile
-            </span>
-          </p>
-          
-          {user && profile ? (
-            <Link
-              href="/profile"
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 hover:bg-slate-800 rounded-lg border border-slate-700 transition-colors"
-            >
-              <div className="text-right">
-                <div className="text-xs font-semibold text-emerald-400">
-                  {profile.display_name || profile.username}
-                </div>
-                <div className="text-[10px] text-slate-500">
-                  ELO: {profile.elo_rating}
-                </div>
-              </div>
-              <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-          ) : (
-            <Link
-              href="/register"
-              className="text-xs text-emerald-400 hover:text-emerald-300 underline"
-            >
-              🔐 Login / Register
-            </Link>
-          )}
-        </div>
+      {/* Login/Register or Profile Card */}
+      {user && profile ? (
+        <Link
+          href="/profile"
+          className={`group flex flex-col items-center justify-center gap-4 p-6 text-center transition hover:bg-slate-900 sm:p-8 ${
+            isMobile ? "border-b border-slate-800" : "border-slate-800"
+          }`}
+        >
+          <div className="text-5xl">👤</div>
+          <div>
+            <h2 className="text-2xl font-extrabold text-purple-400 sm:text-3xl">
+              {profile.display_name || profile.username}
+            </h2>
+            <p className="mx-auto mt-2 max-w-xs text-sm text-slate-400 sm:text-base">
+              ELO: {profile.elo_rating} · {profile.total_games} Spiele · {((profile.total_wins / Math.max(profile.total_games, 1)) * 100).toFixed(0)}% Siegesrate
+            </p>
+            <div className="mt-3 flex items-center justify-center gap-4 text-xs text-slate-500">
+              <span className={profile.total_profit >= 0 ? 'text-green-400' : 'text-red-400'}>
+                Gewinn: {profile.total_profit >= 0 ? '+' : ''}{profile.total_profit.toFixed(0)}
+              </span>
+            </div>
+          </div>
+          <span className="rounded-full bg-purple-500 px-6 py-3 text-base font-bold text-slate-950 group-hover:bg-purple-400">
+            Mein Profil
+          </span>
+        </Link>
+      ) : (
+        <Link
+          href="/register"
+          className={`group flex flex-col items-center justify-center gap-4 p-6 text-center transition hover:bg-slate-900 sm:p-8 ${
+            isMobile ? "border-b border-slate-800" : "border-slate-800"
+          }`}
+        >
+          <div className="text-5xl">🔐</div>
+          <div>
+            <h2 className="text-2xl font-extrabold text-rose-400 sm:text-3xl">Login / Register</h2>
+            <p className="mx-auto mt-2 max-w-xs text-sm text-slate-400 sm:text-base">
+              Save your progress, track stats & compete on leaderboards.
+            </p>
+            <div className="mt-3 rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-2 mx-auto max-w-xs">
+              <p className="text-xs text-amber-300 font-semibold">
+                💎 Early Supporter: Free Forever!
+              </p>
+            </div>
+          </div>
+          <span className="rounded-full bg-rose-500 px-6 py-3 text-base font-bold text-slate-950 group-hover:bg-rose-400">
+            Login
+          </span>
+        </Link>
+      )}
+
+      <div className="col-span-full px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center">
+        <p className="text-xs text-slate-600">
+          ◆ Tradr — tap a mode to start
+          <span className="ml-2 rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-500/80">
+            v3.6.1-full-cards
+          </span>
+        </p>
       </div>
     </div>
   );
