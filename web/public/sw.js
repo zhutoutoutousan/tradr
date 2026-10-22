@@ -1,6 +1,6 @@
-const CACHE_NAME = 'tradr-game-v6';
-const OFFLINE_CACHE = 'tradr-offline-v6';
-const DATA_CACHE = 'tradr-data-v6';
+const CACHE_NAME = 'tradr-game-v7';
+const OFFLINE_CACHE = 'tradr-offline-v7';
+const DATA_CACHE = 'tradr-data-v7';
 
 const STATIC_ASSETS = [
   '/',
@@ -29,6 +29,16 @@ const DATA_URLS = [
   '/data/eurusd.json',
   '/data/gbpusd.json',
   '/data/usdjpy.json',
+  '/data/bac.json',
+  '/data/dis.json',
+  '/data/nflx.json',
+  '/data/ba.json',
+  '/data/pfe.json',
+  '/data/intc.json',
+  '/data/csco.json',
+  '/data/orcl.json',
+  '/data/unh.json',
+  '/data/mcd.json',
 ];
 
 self.addEventListener('install', (event) => {

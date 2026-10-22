@@ -4,7 +4,8 @@ import { offlineStorage } from './offline-storage';
 
 const MARKET_SYMBOLS = [
   'aapl', 'amd', 'amzn', 'googl', 'meta', 'msft', 'nvda', 'tsla',
-  'spy', 'qqq', 'btcusd', 'ethusd', 'eurusd', 'gbpusd', 'usdjpy'
+  'spy', 'qqq', 'btcusd', 'ethusd', 'eurusd', 'gbpusd', 'usdjpy',
+  'bac', 'dis', 'nflx', 'ba', 'pfe', 'intc', 'csco', 'orcl', 'unh', 'mcd'
 ];
 
 export async function precacheMarketData(signal?: AbortSignal): Promise<void> {

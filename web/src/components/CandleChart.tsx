@@ -89,7 +89,8 @@ export default function CandleChart({
     const plotW = W - padR;
     const hasOsc = indicators.some((i) => i.kind === "rsi" || i.kind === "macd");
     const oscH = hasOsc ? Math.floor(H * 0.16) : 0;
-    const plotH = H - padB - oscH;
+    const volH = Math.floor(H * 0.15); // Volume panel height (15% of total)
+    const plotH = H - padB - oscH - volH;
 
     // Slightly wider candles on small screens so they remain legible.
     const candleW = W < 480 ? 5 : 7;
@@ -191,7 +192,7 @@ export default function CandleChart({
     }
 
     if (oscH > 0 && oscLines.length > 0) {
-      const oy0 = plotH + 6;
+      const oy0 = plotH + volH + 2;
       ctx.fillStyle = "#111827";
       ctx.fillRect(0, oy0, plotW, oscH - 6);
       ctx.strokeStyle = GRID;
@@ -236,6 +237,56 @@ export default function CandleChart({
       const h = Math.max(1, Math.abs(cy - oy));
       ctx.fillRect(x - candleW / 2, top, candleW, h);
     });
+
+    // === Volume Panel ===
+    const volY0 = plotH + 4;
+    const volPanelH = volH - 8;
+    
+    // Draw volume panel background
+    ctx.fillStyle = "#0a0e14";
+    ctx.fillRect(0, volY0, plotW, volH - 4);
+    
+    // Draw separator line
+    ctx.strokeStyle = GRID;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, volY0);
+    ctx.lineTo(plotW, volY0);
+    ctx.stroke();
+    
+    // Calculate max volume for scaling
+    let maxVol = 0;
+    for (const c of visible) {
+      if (c.volume > maxVol) maxVol = c.volume;
+    }
+    
+    if (maxVol > 0) {
+      // Draw volume bars
+      visible.forEach((c, i) => {
+        const x = i * slot + candleW / 2 + 2;
+        const up = c.close >= c.open;
+        const volHeight = (c.volume / maxVol) * (volPanelH - 4);
+        const volBottom = volY0 + volPanelH - 2;
+        
+        ctx.fillStyle = up ? UP + "80" : DOWN + "80"; // Semi-transparent
+        ctx.fillRect(x - candleW / 2, volBottom - volHeight, candleW, volHeight);
+      });
+      
+      // Volume label
+      ctx.font = "9px ui-monospace, monospace";
+      ctx.fillStyle = TEXT;
+      ctx.fillText("Vol", 4, volY0 + 12);
+      
+      // Max volume label on right
+      const formatVol = (v: number) => {
+        if (v >= 1e9) return (v / 1e9).toFixed(1) + "B";
+        if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
+        if (v >= 1e3) return (v / 1e3).toFixed(1) + "K";
+        return v.toFixed(0);
+      };
+      ctx.fillText(formatVol(maxVol), plotW + 4, volY0 + 12);
+      ctx.font = "11px ui-monospace, monospace";
+    }
 
     const last = visible[visible.length - 1];
 

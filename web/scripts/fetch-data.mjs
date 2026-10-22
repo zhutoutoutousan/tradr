@@ -58,6 +58,17 @@ const SYMBOLS = [
   { id: "spy", yahoo: "SPY", name: "S&P 500 (SPY)", kind: "stock" },
   { id: "qqq", yahoo: "QQQ", name: "Nasdaq 100 (QQQ)", kind: "stock" },
   { id: "coin", yahoo: "COIN", name: "Coinbase (COIN)", kind: "stock" },
+  // Additional top stocks
+  { id: "bac", yahoo: "BAC", name: "Bank of America (BAC)", kind: "stock" },
+  { id: "dis", yahoo: "DIS", name: "Disney (DIS)", kind: "stock" },
+  { id: "nflx", yahoo: "NFLX", name: "Netflix (NFLX)", kind: "stock" },
+  { id: "ba", yahoo: "BA", name: "Boeing (BA)", kind: "stock" },
+  { id: "pfe", yahoo: "PFE", name: "Pfizer (PFE)", kind: "stock" },
+  { id: "intc", yahoo: "INTC", name: "Intel (INTC)", kind: "stock" },
+  { id: "csco", yahoo: "CSCO", name: "Cisco (CSCO)", kind: "stock" },
+  { id: "orcl", yahoo: "ORCL", name: "Oracle (ORCL)", kind: "stock" },
+  { id: "unh", yahoo: "UNH", name: "UnitedHealth (UNH)", kind: "stock" },
+  { id: "mcd", yahoo: "MCD", name: "McDonald's (MCD)", kind: "stock" },
 ];
 
 async function fetchSymbol(sym) {
