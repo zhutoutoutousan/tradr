@@ -87,7 +87,7 @@ export default function ChallengeModeSelect({ onSelectLevel, onBack }: Challenge
 
         {/* Rewards */}
         <div className="flex items-center gap-2 pt-2 border-t border-slate-700/50">
-          <span className="text-xs text-slate-500">Belohnung:</span>
+          <span className="text-xs text-slate-500">Rewards:</span>
           <span className="text-xs font-mono text-amber-400">+{level.rewards.xp} XP</span>
           {level.rewards.unlocks && level.rewards.unlocks.length > 0 && (
             <span className="text-xs text-violet-400">+{level.rewards.unlocks.length} Unlock(s)</span>
@@ -100,7 +100,7 @@ export default function ChallengeModeSelect({ onSelectLevel, onBack }: Challenge
             <svg className="h-4 w-4 text-slate-600" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
             </svg>
-            <span className="text-xs text-slate-600">Gesperrt</span>
+            <span className="text-xs text-slate-600">Locked</span>
           </div>
         )}
       </button>
@@ -118,9 +118,9 @@ export default function ChallengeModeSelect({ onSelectLevel, onBack }: Challenge
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          Zurück
+          Back
         </button>
-        <h1 className="text-xl font-bold">闯关模式</h1>
+        <h1 className="text-xl font-bold">Challenge Mode</h1>
         <div className="w-20" /> {/* Spacer */}
       </header>
 
@@ -134,7 +134,7 @@ export default function ChallengeModeSelect({ onSelectLevel, onBack }: Challenge
             </span>
           </div>
           <span className="text-xs text-slate-500">
-            {Object.keys(progress.challenges.completedLevels).length} / {STORY_LEVELS.length + CHALLENGE_LEVELS.length} 完成
+            {Object.keys(progress.challenges.completedLevels).length} / {STORY_LEVELS.length + CHALLENGE_LEVELS.length} Completed
           </span>
         </div>
         <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
@@ -179,7 +179,7 @@ export default function ChallengeModeSelect({ onSelectLevel, onBack }: Challenge
               <div className="mb-4">
                 <h2 className="text-lg font-bold text-emerald-400">Story Mode</h2>
                 <p className="text-sm text-slate-500">
-                  Lerne Trading Schritt für Schritt. Schalte neue Powerups frei!
+                  Learn trading step by step. Unlock new powerups!
                 </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -193,7 +193,7 @@ export default function ChallengeModeSelect({ onSelectLevel, onBack }: Challenge
               <div className="mb-4">
                 <h2 className="text-lg font-bold text-amber-400">Challenge Mode</h2>
                 <p className="text-sm text-slate-500">
-                  Schwierige Herausforderungen für erfahrene Trader!
+                  Difficult challenges for experienced traders!
                 </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">

@@ -94,12 +94,12 @@ export default function AuthModal({ open, onClose, onSuccess }: AuthModalProps) 
         {/* Header */}
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-white">
-            {mode === "signin" ? "Anmelden" : "Registrieren"}
+            {mode === "signin" ? "Sign In" : "Sign Up"}
           </h2>
           <p className="mt-1 text-sm text-slate-400">
             {mode === "signin"
-              ? "Melde dich an um deinen Fortschritt zu speichern"
-              : "Erstelle ein Konto um deine Daten zu sichern"}
+              ? "Sign in to save your progress"
+              : "Create an account to secure your data"}
           </p>
         </div>
 
@@ -116,7 +116,7 @@ export default function AuthModal({ open, onClose, onSuccess }: AuthModalProps) 
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            Anmelden
+            Sign In
           </button>
           <button
             onClick={() => {
@@ -129,7 +129,7 @@ export default function AuthModal({ open, onClose, onSuccess }: AuthModalProps) 
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            Registrieren
+            Sign Up
           </button>
         </div>
 
@@ -171,7 +171,7 @@ export default function AuthModal({ open, onClose, onSuccess }: AuthModalProps) 
               disabled={loading}
               className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
             >
-              {loading ? "Lädt..." : "Anmelden"}
+              {loading ? "Loading..." : "Sign In"}
             </button>
           </form>
         )}
@@ -253,7 +253,7 @@ export default function AuthModal({ open, onClose, onSuccess }: AuthModalProps) 
               disabled={loading}
               className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
             >
-              {loading ? "Lädt..." : "Registrieren"}
+              {loading ? "Loading..." : "Sign Up"}
             </button>
           </form>
         )}
@@ -264,10 +264,10 @@ export default function AuthModal({ open, onClose, onSuccess }: AuthModalProps) 
             onClick={onClose}
             className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-750"
           >
-            Als Gast weiterspielen
+            Continue as Guest
           </button>
           <p className="mt-2 text-center text-xs text-slate-500">
-            Fortschritt wird nur lokal gespeichert
+            Progress will only be saved locally
           </p>
         </div>
       </div>
