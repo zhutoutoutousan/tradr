@@ -1,14 +1,17 @@
-const CACHE_NAME = 'tradr-game-v3';
-const OFFLINE_CACHE = 'tradr-offline-v3';
-const DATA_CACHE = 'tradr-data-v3';
+const CACHE_NAME = 'tradr-game-v4';
+const OFFLINE_CACHE = 'tradr-offline-v4';
+const DATA_CACHE = 'tradr-data-v4';
 
 const STATIC_ASSETS = [
   '/',
   '/play',
   '/offline.html',
   '/manifest.json',
+  '/manifest.webmanifest',
   '/favicon.svg',
   '/window.svg',
+  '/icon',
+  '/apple-icon',
 ];
 
 const DATA_URLS = [
@@ -34,13 +37,32 @@ self.addEventListener('install', (event) => {
   console.log('[SW] Install event');
   event.waitUntil(
     Promise.all([
+      // Cache static assets - continue even if some fail
       caches.open(CACHE_NAME).then((cache) => {
         console.log('[SW] Caching static assets');
-        return cache.addAll(STATIC_ASSETS.map(url => new Request(url, {cache: 'reload'})));
+        return Promise.allSettled(
+          STATIC_ASSETS.map(url => 
+            cache.add(new Request(url, {cache: 'reload'}))
+              .catch(err => console.log(`[SW] Failed to cache ${url}:`, err))
+          )
+        );
       }),
+      // Cache game data - continue even if some fail
       caches.open(DATA_CACHE).then((cache) => {
         console.log('[SW] Caching game data');
-        return cache.addAll(DATA_URLS.map(url => new Request(url, {cache: 'reload'})));
+        let cached = 0;
+        return Promise.allSettled(
+          DATA_URLS.map(url => 
+            cache.add(new Request(url, {cache: 'reload'}))
+              .then(() => {
+                cached++;
+                console.log(`[Precache] Cached ${url.replace('/data/', '').replace('.json', '')} (${cached}/${DATA_URLS.length})`);
+              })
+              .catch(err => console.log(`[SW] Failed to cache ${url}:`, err))
+          )
+        ).then(() => {
+          console.log(`[Precache] Complete: ${cached} cached, ${DATA_URLS.length - cached} failed`);
+        });
       })
     ]).then(() => {
       console.log('[SW] Skip waiting');
@@ -96,18 +118,37 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (url.pathname.startsWith('/_next/')) {
+  // Handle Next.js chunks and static files - AGGRESSIVE OFFLINE FIRST
+  if (url.pathname.startsWith('/_next/') || 
+      url.pathname.endsWith('.js') || 
+      url.pathname.endsWith('.css') ||
+      url.pathname.endsWith('.woff2') ||
+      url.pathname.endsWith('.svg') ||
+      url.pathname.endsWith('.png') ||
+      url.pathname.endsWith('.jpg')) {
     event.respondWith(
       caches.open(CACHE_NAME).then((cache) => {
         return cache.match(request).then((cachedResponse) => {
+          // Return cache immediately for offline support
           if (cachedResponse) {
+            // Update cache in background
+            fetch(request).then((networkResponse) => {
+              if (networkResponse && networkResponse.status === 200) {
+                cache.put(request, networkResponse.clone());
+              }
+            }).catch(() => {});
             return cachedResponse;
           }
+          
+          // Try network, cache if successful
           return fetch(request).then((networkResponse) => {
             if (networkResponse && networkResponse.status === 200) {
               cache.put(request, networkResponse.clone());
             }
             return networkResponse;
+          }).catch(() => {
+            // Completely offline - return cached or fail gracefully
+            return caches.match('/offline.html');
           });
         });
       })
@@ -115,38 +156,48 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle page navigation requests
+  // Handle page navigation requests - OFFLINE FIRST for /play
   if (url.pathname === '/' || 
       url.pathname === '/play' || 
       url.pathname === '/community' ||
-      url.pathname === '/multiplayer') {
+      url.pathname === '/multiplayer' ||
+      url.pathname === '/register') {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // Cache successful responses
-          if (response && response.status === 200) {
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseToCache);
-            });
-          }
-          return response;
-        })
-        .catch(() => {
-          // Try cache first
-          return caches.match(request).then((cachedResponse) => {
-            if (cachedResponse) {
-              return cachedResponse;
-            }
-            // If no cache, try root page
-            return caches.match('/').then((rootPage) => {
-              if (rootPage) {
-                return rootPage;
+      caches.match(request)
+        .then((cachedResponse) => {
+          if (cachedResponse) {
+            // Return cache immediately, update in background
+            fetch(request).then((networkResponse) => {
+              if (networkResponse && networkResponse.status === 200) {
+                caches.open(CACHE_NAME).then((cache) => {
+                  cache.put(request, networkResponse.clone());
+                });
               }
-              // Last resort: offline page
+            }).catch(() => {});
+            return cachedResponse;
+          }
+          
+          // No cache - try network
+          return fetch(request)
+            .then((response) => {
+              if (response && response.status === 200) {
+                const responseToCache = response.clone();
+                caches.open(CACHE_NAME).then((cache) => {
+                  cache.put(request, responseToCache);
+                });
+              }
+              return response;
+            })
+            .catch(() => {
+              // Completely offline - show offline page
+              if (url.pathname === '/play') {
+                // For /play, try to show cached version or offline page
+                return caches.match('/play').then(cached => {
+                  return cached || caches.match('/offline.html');
+                });
+              }
               return caches.match('/offline.html');
             });
-          });
         })
     );
     return;

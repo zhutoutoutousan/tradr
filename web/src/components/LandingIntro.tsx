@@ -29,10 +29,16 @@ export default function LandingIntro({
           <div className="flex items-center gap-2">
             <span className="text-lg font-bold tracking-tight text-emerald-400">◆ Tradr</span>
             <span className="rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-xs font-mono font-semibold text-emerald-400">
-              v3.0.3-emergency
+              v3.1.0-offline
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Link
+              href="/register"
+              className="rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-3 py-1.5 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/20"
+            >
+              🔐 Login / Register
+            </Link>
             <Link
               href="/community"
               className="rounded-lg border border-sky-500/50 px-3 py-1.5 text-sm font-semibold text-sky-300 hover:bg-sky-500/10"
