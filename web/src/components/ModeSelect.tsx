@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import ClearSWButton from "@/components/ClearSWButton";
 
@@ -10,35 +9,14 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
   const isMobile = useIsMobile();
 
   return (
-    <div className="relative min-h-[100dvh] bg-slate-950">
-      {/* Top Bar with Login */}
-      <div className="fixed top-0 left-0 right-0 z-50 border-b border-slate-800 bg-slate-900/95 backdrop-blur">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-emerald-400">◆ Tradr</span>
-            <span className="rounded bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-400">
-              v3.1.0-offline
-            </span>
-          </div>
-          <Link
-            href="/register"
-            className="rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20"
-          >
-            🔐 Login
-          </Link>
-        </div>
-      </div>
-
+    <div
+      className={
+        isMobile
+          ? "grid min-h-[100dvh] w-full grid-rows-[1fr_1fr_1fr_1fr_auto] bg-slate-950 text-slate-100"
+          : "grid min-h-[100dvh] w-full grid-cols-2 grid-rows-[1fr_1fr_auto] bg-slate-950 text-slate-100"
+      }
+    >
       <ClearSWButton />
-      
-      {/* Mode Selection Grid */}
-      <div
-        className={
-          isMobile
-            ? "grid min-h-[100dvh] w-full grid-rows-[auto_1fr_1fr_1fr_1fr_auto] pt-[52px] text-slate-100"
-            : "grid min-h-[100dvh] w-full grid-cols-2 grid-rows-[auto_1fr_1fr_auto] pt-[52px] text-slate-100"
-        }
-      >
       <button
         type="button"
         data-testid="mode-solo"
@@ -122,10 +100,9 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
       <p className="col-span-full px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center text-xs text-slate-600">
         ◆ Tradr — tap a mode to start
         <span className="ml-2 rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-500/80">
-          v3.1.0-offline
+          v3.0.3-emergency
         </span>
       </p>
-      </div>
     </div>
   );
 }
