@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { Html5Qrcode } from 'html5-qrcode';
 import { webrtcManager } from '@/lib/p2p/webrtc-manager';
 import type { ConnectionState } from '@/lib/p2p/webrtc-manager';
 
@@ -18,6 +19,9 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
   const [answerInput, setAnswerInput] = useState('');
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [error, setError] = useState('');
+  const [scanningAnswer, setScanningAnswer] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
 
   useEffect(() => {
     async function createOffer() {
@@ -48,22 +52,80 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
 
     return () => {
       unsubscribe();
+      stopScanningAnswer();
     };
   }, [username, onConnected]);
 
-  const handleAnswerSubmit = async () => {
-    if (!answerInput.trim()) return;
+  const startScanningAnswer = async () => {
+    try {
+      console.log('[LocalMP Host] Starting Answer QR scanner...');
+      
+      // Request camera permission first (iOS compatibility)
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' } 
+        });
+        stream.getTracks().forEach(track => track.stop());
+      } catch (permErr) {
+        console.error('[LocalMP Host] Camera permission denied:', permErr);
+        setError('Kamera-Zugriff verweigert. Nutze manuelle Eingabe.');
+        return;
+      }
+
+      const scanner = new Html5Qrcode('answer-qr-reader');
+      scannerRef.current = scanner;
+
+      await scanner.start(
+        { facingMode: 'environment' },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+        },
+        async (decodedText) => {
+          console.log('[LocalMP Host] Answer QR scanned');
+          setAnswerInput(decodedText);
+          await handleAnswerCode(decodedText);
+          stopScanningAnswer();
+        },
+        (errorMessage) => {
+          // Ignore scanning errors
+        }
+      );
+
+      setScanningAnswer(true);
+      setError('');
+    } catch (err: any) {
+      console.error('[LocalMP Host] Answer scanner error:', err);
+      setError('Kamera konnte nicht gestartet werden. Nutze manuelle Eingabe.');
+    }
+  };
+
+  const stopScanningAnswer = () => {
+    if (scannerRef.current) {
+      scannerRef.current.stop().catch(console.error);
+      scannerRef.current = null;
+    }
+    setScanningAnswer(false);
+  };
+
+  const handleAnswerCode = async (code: string) => {
+    setLoading(true);
+    setError('');
 
     try {
-      setLoading(true);
-      setError('');
-      await webrtcManager.processAnswer(answerInput.trim());
+      await webrtcManager.processAnswer(code.trim());
       console.log('[LocalMP Host] Answer processed, waiting for connection...');
     } catch (err) {
       console.error('[LocalMP Host] Failed to process answer:', err);
       setError('Ungültiger Antwort-Code');
       setLoading(false);
     }
+  };
+
+  const handleAnswerSubmit = async () => {
+    if (!answerInput.trim()) return;
+    await handleAnswerCode(answerInput.trim());
   };
 
   const handlePasteAnswer = async () => {
@@ -142,37 +204,113 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
         </div>
       </div>
 
-      {/* Alternative: Manual Code Input */}
+      {/* Alternative: Scan or Enter Answer Code */}
       {waitingForAnswer && (
         <div className="w-full max-w-md">
-          <div className="text-center text-sm text-slate-400 mb-4">
-            Oder Antwort-Code manuell eingeben:
+          {/* Step 2 Instructions */}
+          <div className="bg-blue-500/10 border border-blue-500/50 rounded-lg p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">✈️</span>
+              <div>
+                <p className="font-semibold text-white mb-2">Schritt 2: Antwort empfangen</p>
+                <p className="text-sm text-slate-300 mb-2">
+                  Dein Mitspieler zeigt jetzt einen neuen QR-Code.
+                </p>
+                <p className="text-sm text-amber-300">
+                  📷 Scanne seinen Antwort-QR-Code oder gib den Code manuell ein.
+                </p>
+              </div>
+            </div>
           </div>
-          
+
+          {/* Mode Toggle */}
           <div className="flex gap-2 mb-4">
-            <input
-              type="text"
-              value={answerInput}
-              onChange={(e) => setAnswerInput(e.target.value)}
-              placeholder="Antwort-Code hier einfügen..."
-              className="flex-1 px-3 py-2 bg-slate-800 border border-slate-600 rounded text-white text-sm font-mono focus:outline-none focus:border-emerald-500"
-            />
             <button
-              onClick={handlePasteAnswer}
-              className="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded text-white text-sm"
-              title="Einfügen"
+              onClick={() => {
+                setManualMode(false);
+                stopScanningAnswer();
+              }}
+              className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-colors ${
+                !manualMode
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+              }`}
             >
-              📋
+              📷 QR-Scan
+            </button>
+            <button
+              onClick={() => {
+                setManualMode(true);
+                stopScanningAnswer();
+              }}
+              className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-colors ${
+                manualMode
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              ⌨️ Manuell
             </button>
           </div>
 
-          <button
-            onClick={handleAnswerSubmit}
-            disabled={!answerInput.trim() || loading}
-            className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold rounded transition-colors"
-          >
-            {loading ? 'Verbinde...' : 'Verbinden'}
-          </button>
+          {/* QR Scanner for Answer */}
+          {!manualMode && !scanningAnswer && (
+            <button
+              onClick={startScanningAnswer}
+              disabled={loading}
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-700 text-white font-semibold rounded-lg transition-colors mb-4"
+            >
+              📷 Antwort-QR-Code scannen
+            </button>
+          )}
+
+          {!manualMode && scanningAnswer && (
+            <div className="space-y-4 mb-4">
+              <div className="bg-slate-900 rounded-lg p-2">
+                <div id="answer-qr-reader" className="rounded-lg overflow-hidden" style={{ minHeight: '300px' }} />
+              </div>
+              <button
+                onClick={stopScanningAnswer}
+                className="w-full py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors"
+              >
+                Scannen abbrechen
+              </button>
+            </div>
+          )}
+
+          {/* Manual Input */}
+          {manualMode && (
+            <>
+              <div className="text-center text-sm text-slate-400 mb-3">
+                Antwort-Code manuell eingeben:
+              </div>
+              
+              <div className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  value={answerInput}
+                  onChange={(e) => setAnswerInput(e.target.value)}
+                  placeholder="Antwort-Code hier einfügen..."
+                  className="flex-1 px-3 py-2 bg-slate-800 border border-slate-600 rounded text-white text-sm font-mono focus:outline-none focus:border-emerald-500"
+                />
+                <button
+                  onClick={handlePasteAnswer}
+                  className="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded text-white text-sm"
+                  title="Einfügen"
+                >
+                  📋
+                </button>
+              </div>
+
+              <button
+                onClick={handleAnswerSubmit}
+                disabled={!answerInput.trim() || loading}
+                className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold rounded transition-colors"
+              >
+                {loading ? 'Verbinde...' : 'Verbinden'}
+              </button>
+            </>
+          )}
         </div>
       )}
 

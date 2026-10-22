@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { webrtcManager } from '@/lib/p2p/webrtc-manager';
 import type { ConnectionState } from '@/lib/p2p/webrtc-manager';
@@ -163,38 +164,52 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
           ✅ Antwort-Code erstellt
         </h2>
         <p className="text-slate-400 mb-6 text-center">
-          Zeige diesen Code dem Host oder sende ihn per Copy & Paste
+          Zeige diesen QR-Code dem Host (飞行模式可用！✈️)
         </p>
 
-        {/* Answer Code Display */}
-        <div className="bg-slate-800 rounded-lg p-4 mb-6 w-full max-w-md border border-slate-700">
-          <div className="text-xs text-slate-400 mb-2">Antwort-Code:</div>
-          <div className="font-mono text-xs text-white break-all bg-slate-900 p-3 rounded mb-3">
-            {answerCode}
-          </div>
-          <button
-            onClick={copyAnswerCode}
-            className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded transition-colors"
-          >
-            📋 Code kopieren
-          </button>
+        {/* Answer QR Code - Main Feature for Airplane Mode */}
+        <div className="bg-white p-6 rounded-lg mb-6 shadow-lg">
+          <QRCodeSVG
+            value={answerCode}
+            size={256}
+            level="M"
+            includeMargin={true}
+          />
         </div>
 
-        {/* Instructions */}
-        <div className="bg-blue-500/10 border border-blue-500/50 rounded-lg p-4 mb-6 w-full max-w-md">
+        {/* Airplane Mode Instructions */}
+        <div className="bg-emerald-500/10 border border-emerald-500/50 rounded-lg p-4 mb-6 w-full max-w-md">
           <div className="flex items-start gap-3">
-            <span className="text-2xl">ℹ️</span>
+            <span className="text-2xl">✈️</span>
             <div>
-              <p className="font-semibold text-white mb-2">Nächste Schritte:</p>
+              <p className="font-semibold text-emerald-300 mb-2">Flugmodus / Offline:</p>
               <ol className="text-sm text-slate-300 space-y-1 list-decimal list-inside">
-                <li>Kopiere den Antwort-Code</li>
-                <li>Sende ihn dem Host (z.B. per Chat)</li>
-                <li>Host gibt den Code ein</li>
+                <li>Host scannt <strong>diesen QR-Code</strong></li>
                 <li>Verbindung wird hergestellt!</li>
+                <li>Kein Internet nötig! 🎮</li>
               </ol>
             </div>
           </div>
         </div>
+
+        {/* Alternative: Text Code for Manual Entry */}
+        <details className="w-full max-w-md">
+          <summary className="cursor-pointer text-sm text-slate-400 hover:text-slate-300 mb-2">
+            ⌨️ Oder Code manuell kopieren...
+          </summary>
+          <div className="bg-slate-800 rounded-lg p-4 mb-6 border border-slate-700">
+            <div className="text-xs text-slate-400 mb-2">Antwort-Code (manuell):</div>
+            <div className="font-mono text-xs text-white break-all bg-slate-900 p-3 rounded mb-3">
+              {answerCode}
+            </div>
+            <button
+              onClick={copyAnswerCode}
+              className="w-full py-2 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded transition-colors"
+            >
+              📋 Code kopieren
+            </button>
+          </div>
+        </details>
 
         {/* Connection Status */}
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800/50 rounded-full border border-slate-700">
