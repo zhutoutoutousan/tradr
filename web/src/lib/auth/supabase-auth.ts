@@ -70,14 +70,24 @@ class AuthService {
         };
       }
 
-      await this.createUserProfile(data.user.id, username, displayName);
+      // Only create profile if we have an active session
+      // If email confirmation is required, profile will be created after confirmation
+      if (data.session) {
+        try {
+          await this.createUserProfile(data.user.id, username, displayName);
+        } catch (profileErr) {
+          console.error('[Auth] Profile creation failed (non-fatal):', profileErr);
+          // Don't fail registration if profile creation fails - can retry later
+        }
+      }
 
       return { user: data.user, session: data.session, error: null };
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : (typeof err === 'object' && err !== null && 'message' in err ? String((err as any).message) : String(err));
       return {
         user: null,
         session: null,
-        error: { message: String(err), name: 'UnknownError', status: 500 } as AuthError
+        error: { message: errorMessage, name: 'UnknownError', status: 500 } as AuthError
       };
     }
   }

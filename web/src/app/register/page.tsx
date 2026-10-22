@@ -36,14 +36,23 @@ export default function RegisterPage() {
         if (!username) {
           throw new Error("Username is required");
         }
-        const { error } = await authService.signUp({
+        const { user, session, error } = await authService.signUp({
           email,
           password,
           username,
           displayName: username,
         });
         if (error) throw new Error(error.message);
-        setSuccess("Registration successful! Check your email to confirm.");
+        
+        // Check if email confirmation is required
+        if (user && !session) {
+          setSuccess("✅ Registration successful! Please check your email to verify your account.");
+        } else if (user && session) {
+          setSuccess("Registration successful! Redirecting...");
+          setTimeout(() => {
+            window.location.href = "/play";
+          }, 1000);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");

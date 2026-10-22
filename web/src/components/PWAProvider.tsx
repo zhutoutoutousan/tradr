@@ -49,11 +49,19 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === 'undefined') return;
 
     let lastCheckTime = 0;
-    const MIN_CHECK_INTERVAL = 30000; // 30 seconds minimum between checks
+    const MIN_CHECK_INTERVAL = 120000; // 2 minutes (increased from 30s)
+    let updateCheckCount = 0;
+    const MAX_CHECKS = 3; // Only check 3 times per session
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         const now = Date.now();
+        
+        // Hard limit: max 3 checks per session
+        if (updateCheckCount >= MAX_CHECKS) {
+          console.log('[PWA] Max update checks reached, skipping');
+          return;
+        }
         
         // Throttle: Don't check if we checked recently
         if (now - lastCheckTime < MIN_CHECK_INTERVAL) {
@@ -62,6 +70,8 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
         }
         
         lastCheckTime = now;
+        updateCheckCount++;
+        console.log(`[PWA] Update check ${updateCheckCount}/${MAX_CHECKS}`);
         
         import('@/lib/pwa/sw-register').then(({ swManager }) => {
           swManager.checkForUpdates();
