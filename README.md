@@ -463,3 +463,4 @@ vercel --prod
 **Built with ❤️ for traders and developers**
 
 **Ready to compete? Let's trade! 🚀**
+# Trigger rebuild
