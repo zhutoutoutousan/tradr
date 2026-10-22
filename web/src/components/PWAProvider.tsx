@@ -6,12 +6,18 @@ import { startOfflineSync } from '@/lib/pwa/offline-sync';
 import { startBackgroundPrecache } from '@/lib/pwa/precache-data';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
+import { useSwipeDismiss } from '@/hooks/useSwipeDismiss';
 
 export function PWAProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const isOnline = useOnlineStatus();
   const { isUpdateAvailable, skipWaiting } = useServiceWorkerUpdate();
   const { canInstall, isStandalone, promptInstall } = usePWAInstall();
+  
+  // Swipe dismiss hooks for each banner
+  const offlineBanner = useSwipeDismiss();
+  const updateBanner = useSwipeDismiss();
+  const installBanner = useSwipeDismiss();
 
   useEffect(() => {
     setMounted(true);
@@ -52,8 +58,12 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
     <>
       {children}
       
-      {!isOnline && (
-        <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-emerald-600/90 backdrop-blur-sm text-white px-4 py-3 rounded-lg shadow-lg z-50 flex items-center gap-3">
+      {!isOnline && !offlineBanner.isDismissed && (
+        <div 
+          className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-emerald-600/90 backdrop-blur-sm text-white px-4 py-3 rounded-lg shadow-lg z-50 flex items-center gap-3 touch-pan-y"
+          style={offlineBanner.style}
+          {...offlineBanner.handlers}
+        >
           <svg className="w-5 h-5 flex-shrink-0 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
@@ -61,11 +71,24 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
             <div className="font-semibold">Offline-Modus aktiv</div>
             <div className="text-sm text-white/90">Tradr funktioniert weiter mit gespeicherten Daten</div>
           </div>
+          <button
+            onClick={offlineBanner.dismiss}
+            className="ml-2 text-white/70 hover:text-white transition-colors hidden md:block"
+            aria-label="Schließen"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       )}
 
-      {isUpdateAvailable && (
-        <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-blue-600 text-white px-4 py-3 rounded-lg shadow-lg z-50">
+      {isUpdateAvailable && !updateBanner.isDismissed && (
+        <div 
+          className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-blue-600 text-white px-4 py-3 rounded-lg shadow-lg z-50 touch-pan-y"
+          style={updateBanner.style}
+          {...updateBanner.handlers}
+        >
           <div className="flex items-center justify-between gap-3">
             <div className="flex-1">
               <div className="font-semibold">Update verfügbar</div>
@@ -77,12 +100,25 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
             >
               Aktualisieren
             </button>
+            <button
+              onClick={updateBanner.dismiss}
+              className="ml-2 text-white/70 hover:text-white transition-colors hidden md:block"
+              aria-label="Schließen"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
       )}
 
-      {canInstall && !isStandalone && (
-        <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-slate-900 text-white px-4 py-3 rounded-lg shadow-lg z-50 border border-slate-700">
+      {canInstall && !isStandalone && !installBanner.isDismissed && (
+        <div 
+          className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-slate-900 text-white px-4 py-3 rounded-lg shadow-lg z-50 border border-slate-700 touch-pan-y"
+          style={installBanner.style}
+          {...installBanner.handlers}
+        >
           <div className="flex items-center justify-between gap-3">
             <div className="flex-1">
               <div className="font-semibold">App installieren</div>
@@ -93,6 +129,15 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
               className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded font-semibold text-sm transition-colors"
             >
               Installieren
+            </button>
+            <button
+              onClick={installBanner.dismiss}
+              className="ml-2 text-slate-400 hover:text-white transition-colors hidden md:block"
+              aria-label="Schließen"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
         </div>

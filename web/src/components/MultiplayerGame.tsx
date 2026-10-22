@@ -36,7 +36,7 @@ const KIND_LABELS: Record<string, string> = {
 };
 
 // Bump on each deploy so a stale cached build is obvious on every device.
-const BUILD_TAG = "v2.10-room-qr-fix";
+const BUILD_TAG = "v2.11-swipe-dismiss";
 
 export default function MultiplayerGame({
   room,
