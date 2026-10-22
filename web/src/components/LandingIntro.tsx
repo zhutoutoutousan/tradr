@@ -29,7 +29,7 @@ export default function LandingIntro({
           <div className="flex items-center gap-2">
             <span className="text-lg font-bold tracking-tight text-emerald-400">◆ Tradr</span>
             <span className="rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-xs font-mono font-semibold text-emerald-400">
-              v3.0-challenge-mode
+              v3.0.1-hotfix
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
