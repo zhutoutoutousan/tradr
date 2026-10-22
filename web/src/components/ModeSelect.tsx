@@ -45,13 +45,13 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
       >
         <div className="text-5xl">🏆</div>
         <div>
-          <h2 className="text-2xl font-extrabold text-amber-400 sm:text-3xl">闯关模式</h2>
+          <h2 className="text-2xl font-extrabold text-amber-400 sm:text-3xl">Challenge Mode</h2>
           <p className="mx-auto mt-2 max-w-xs text-sm text-slate-400 sm:text-base">
             Story & Challenge levels. Unlock powerups & achievements!
           </p>
         </div>
         <span className="rounded-full bg-amber-500 px-6 py-3 text-base font-bold text-slate-950 group-hover:bg-amber-400">
-          Levels spielen
+          Play Levels
         </span>
       </button>
 
