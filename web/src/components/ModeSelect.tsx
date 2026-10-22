@@ -1,13 +1,40 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import ClearSWButton from "@/components/ClearSWButton";
+import { authService, type UserProfile } from "@/lib/auth/supabase-auth";
 
 export type GameMode = "solo" | "challenge" | "multiplayer" | "local-multiplayer";
 
 export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => void }) {
   const isMobile = useIsMobile();
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { session } = await authService.getSession();
+      if (session?.user) {
+        setUser(session.user);
+        const userProfile = await authService.getUserProfile(session.user.id);
+        setProfile(userProfile);
+      }
+    };
+    checkAuth();
+
+    const unsubscribe = authService.onAuthStateChange((authUser) => {
+      setUser(authUser);
+      if (authUser) {
+        authService.getUserProfile(authUser.id).then(setProfile);
+      } else {
+        setProfile(null);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
 
   return (
     <div
@@ -98,19 +125,41 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
         </span>
       </button>
 
-      <div className="col-span-full px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center">
-        <p className="text-xs text-slate-600">
-          ◆ Tradr — tap a mode to start
-          <span className="ml-2 rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-500/80">
-            v3.5.2-qr-retry
-          </span>
-        </p>
-        <Link
-          href="/register"
-          className="mt-2 inline-block text-xs text-emerald-400 hover:text-emerald-300 underline"
-        >
-          🔐 Login / Register
-        </Link>
+      <div className="col-span-full px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="flex items-center justify-between max-w-4xl mx-auto">
+          <p className="text-xs text-slate-600">
+            ◆ Tradr — tap a mode to start
+            <span className="ml-2 rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-500/80">
+              v3.6.0-profile
+            </span>
+          </p>
+          
+          {user && profile ? (
+            <Link
+              href="/profile"
+              className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 hover:bg-slate-800 rounded-lg border border-slate-700 transition-colors"
+            >
+              <div className="text-right">
+                <div className="text-xs font-semibold text-emerald-400">
+                  {profile.display_name || profile.username}
+                </div>
+                <div className="text-[10px] text-slate-500">
+                  ELO: {profile.elo_rating}
+                </div>
+              </div>
+              <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          ) : (
+            <Link
+              href="/register"
+              className="text-xs text-emerald-400 hover:text-emerald-300 underline"
+            >
+              🔐 Login / Register
+            </Link>
+          )}
+        </div>
       </div>
     </div>
   );

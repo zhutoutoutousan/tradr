@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { RoundResult } from "@/hooks/useGame";
+import { authService, type UserProfile } from "@/lib/auth/supabase-auth";
 
 const ORDINAL = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
 
@@ -21,6 +23,31 @@ export default function LandingIntro({
   onChangeMode?: () => void;
 }) {
   const won = result?.rank === 1;
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { session } = await authService.getSession();
+      if (session?.user) {
+        setUser(session.user);
+        const userProfile = await authService.getUserProfile(session.user.id);
+        setProfile(userProfile);
+      }
+    };
+    checkAuth();
+
+    const unsubscribe = authService.onAuthStateChange((authUser) => {
+      setUser(authUser);
+      if (authUser) {
+        authService.getUserProfile(authUser.id).then(setProfile);
+      } else {
+        setProfile(null);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -29,16 +56,25 @@ export default function LandingIntro({
           <div className="flex items-center gap-2">
             <span className="text-lg font-bold tracking-tight text-emerald-400">◆ Tradr</span>
             <span className="rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-xs font-mono font-semibold text-emerald-400">
-              v3.5.2-qr-retry
+              v3.6.0-profile
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link
-              href="/register"
-              className="rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-3 py-1.5 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/20"
-            >
-              🔐 Login
-            </Link>
+            {user && profile ? (
+              <Link
+                href="/profile"
+                className="rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-3 py-1.5 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/20"
+              >
+                👤 {profile.display_name || profile.username} (ELO: {profile.elo_rating})
+              </Link>
+            ) : (
+              <Link
+                href="/register"
+                className="rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-3 py-1.5 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/20"
+              >
+                🔐 Login
+              </Link>
+            )}
             <Link
               href="/community"
               className="rounded-lg border border-sky-500/50 px-3 py-1.5 text-sm font-semibold text-sky-300 hover:bg-sky-500/10"
