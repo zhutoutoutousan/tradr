@@ -34,6 +34,12 @@ export default function LandingIntro({
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
+              href="/register"
+              className="rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-3 py-1.5 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/20"
+            >
+              🔐 Login
+            </Link>
+            <Link
               href="/community"
               className="rounded-lg border border-sky-500/50 px-3 py-1.5 text-sm font-semibold text-sky-300 hover:bg-sky-500/10"
             >

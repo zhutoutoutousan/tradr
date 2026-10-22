@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import ClearSWButton from "@/components/ClearSWButton";
 
@@ -97,12 +98,20 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
         </span>
       </button>
 
-      <p className="col-span-full px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center text-xs text-slate-600">
-        ◆ Tradr — tap a mode to start
-        <span className="ml-2 rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-500/80">
-          v3.0.3-emergency
-        </span>
-      </p>
+      <div className="col-span-full px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center">
+        <p className="text-xs text-slate-600">
+          ◆ Tradr — tap a mode to start
+          <span className="ml-2 rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-500/80">
+            v3.0.3-emergency
+          </span>
+        </p>
+        <Link
+          href="/register"
+          className="mt-2 inline-block text-xs text-emerald-400 hover:text-emerald-300 underline"
+        >
+          🔐 Login / Register
+        </Link>
+      </div>
     </div>
   );
 }
