@@ -1,6 +1,6 @@
-const CACHE_NAME = 'tradr-game-v4';
-const OFFLINE_CACHE = 'tradr-offline-v4';
-const DATA_CACHE = 'tradr-data-v4';
+const CACHE_NAME = 'tradr-game-v5';
+const OFFLINE_CACHE = 'tradr-offline-v5';
+const DATA_CACHE = 'tradr-data-v5';
 
 const STATIC_ASSETS = [
   '/',
@@ -35,16 +35,43 @@ self.addEventListener('install', (event) => {
   console.log('[SW] Install event');
   event.waitUntil(
     Promise.all([
-      // Cache static assets - don't fail if some fail
-      caches.open(CACHE_NAME).then((cache) => {
-        console.log('[SW] Caching static assets');
-        return Promise.allSettled(
-          STATIC_ASSETS.map(url => 
-            cache.add(new Request(url, {cache: 'reload'}))
-              .catch(err => console.log(`[SW] Failed to cache ${url}:`, err))
-          )
-        );
+      // Cache critical pages - MUST succeed for offline to work
+      caches.open(CACHE_NAME).then(async (cache) => {
+        console.log('[SW] Caching critical pages...');
+        // Cache home and play pages (critical for offline)
+        try {
+          await cache.add(new Request('/', {cache: 'reload'}));
+          console.log('[SW] ✅ Cached /');
+        } catch (err) {
+          console.error('[SW] ❌ Failed to cache /:', err);
+        }
+        
+        try {
+          await cache.add(new Request('/play', {cache: 'reload'}));
+          console.log('[SW] ✅ Cached /play');
+        } catch (err) {
+          console.error('[SW] ❌ Failed to cache /play:', err);
+        }
+        
+        // Cache offline page (fallback)
+        try {
+          await cache.add(new Request('/offline.html', {cache: 'reload'}));
+          console.log('[SW] ✅ Cached /offline.html');
+        } catch (err) {
+          console.error('[SW] ❌ Failed to cache /offline.html:', err);
+        }
+        
+        // Cache other static assets (non-critical)
+        const otherAssets = ['/manifest.json', '/manifest.webmanifest', '/favicon.svg', '/window.svg'];
+        for (const url of otherAssets) {
+          try {
+            await cache.add(new Request(url, {cache: 'reload'}));
+          } catch (err) {
+            console.log(`[SW] Failed to cache ${url}:`, err);
+          }
+        }
       }),
+      
       // Cache game data
       caches.open(DATA_CACHE).then((cache) => {
         console.log('[SW] Precaching game data...');
@@ -163,17 +190,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle page navigation requests - CACHE FIRST for offline
-  if (url.pathname === '/' || 
+  // Handle page navigation requests - AGGRESSIVE CACHE FIRST
+  if (request.mode === 'navigate' || 
+      url.pathname === '/' || 
       url.pathname === '/play' || 
       url.pathname === '/community' ||
       url.pathname === '/multiplayer' ||
       url.pathname === '/register') {
     event.respondWith(
-      caches.match(request)
+      caches.match(request, { ignoreSearch: true })
         .then((cachedResponse) => {
-          // If we have cache, return it immediately and update in background
+          // ALWAYS return cache if available (even on refresh)
           if (cachedResponse) {
+            console.log('[SW] Serving from cache:', url.pathname);
+            // Update cache in background
             fetch(request).then((networkResponse) => {
               if (networkResponse && networkResponse.status === 200) {
                 caches.open(CACHE_NAME).then((cache) => {
@@ -185,6 +215,7 @@ self.addEventListener('fetch', (event) => {
           }
           
           // No cache - try network
+          console.log('[SW] No cache, trying network:', url.pathname);
           return fetch(request)
             .then((response) => {
               if (response && response.status === 200) {
@@ -197,6 +228,7 @@ self.addEventListener('fetch', (event) => {
             })
             .catch(() => {
               // Offline and no cache - show offline page
+              console.log('[SW] Offline, showing fallback:', url.pathname);
               return caches.match('/offline.html').then(offlinePage => {
                 return offlinePage || new Response('Offline', { 
                   status: 503, 
