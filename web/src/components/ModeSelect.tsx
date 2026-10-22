@@ -1,6 +1,7 @@
 "use client";
 
 import { useIsMobile } from "@/hooks/useIsMobile";
+import ClearSWButton from "@/components/ClearSWButton";
 
 export type GameMode = "solo" | "challenge" | "multiplayer" | "local-multiplayer";
 
@@ -15,6 +16,7 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
           : "grid min-h-[100dvh] w-full grid-cols-2 grid-rows-[1fr_1fr_auto] bg-slate-950 text-slate-100"
       }
     >
+      <ClearSWButton />
       <button
         type="button"
         data-testid="mode-solo"
@@ -98,7 +100,7 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
       <p className="col-span-full px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center text-xs text-slate-600">
         ◆ Tradr — tap a mode to start
         <span className="ml-2 rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-500/80">
-          v3.0.2-sw-fix
+          v3.0.3-emergency
         </span>
       </p>
     </div>

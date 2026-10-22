@@ -88,7 +88,20 @@ export default function PlayClient() {
 
   const pickMode = useCallback((mode: GameMode) => {
     setGameMode(mode);
-    if (mode === "multiplayer") return;
+    
+    // Handle different game modes
+    if (mode === "multiplayer") {
+      return; // Stay on multiplayer join screen
+    }
+    
+    if (mode === "challenge") {
+      // Challenge Mode not implemented yet - show message
+      alert("Challenge Mode coming soon! Please select another mode.");
+      setGameMode(null);
+      return;
+    }
+    
+    // Solo and Local Multiplayer: check tutorial
     const seen = localStorage.getItem(TUTORIAL_KEY);
     setPhase(seen ? "playing" : "tutorial");
   }, []);
