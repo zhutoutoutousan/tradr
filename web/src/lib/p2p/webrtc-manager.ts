@@ -1,5 +1,13 @@
 "use client";
 
+import { decodeSignal, encodeSignal } from './signal-codec';
+
+// crypto.randomUUID only exists in secure contexts (not on plain-http LAN hosts)
+const randomId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+
 export type PeerRole = 'host' | 'guest';
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'failed';
 
@@ -32,7 +40,7 @@ class WebRTCManager {
   async createOffer(username: string): Promise<string> {
     this.role = 'host';
     this.localInfo = {
-      id: crypto.randomUUID(),
+      id: randomId(),
       role: 'host',
       username
     };
@@ -57,24 +65,19 @@ class WebRTCManager {
 
     await this.waitForICEGathering();
 
-    const offerData = {
-      offer: this.peerConnection.localDescription,
-      info: this.localInfo
-    };
-
-    return btoa(JSON.stringify(offerData));
+    return encodeSignal(this.peerConnection.localDescription!, username);
   }
 
   async acceptOffer(offerString: string, username: string): Promise<string> {
     this.role = 'guest';
     this.localInfo = {
-      id: crypto.randomUUID(),
+      id: randomId(),
       role: 'guest',
       username
     };
 
-    const offerData = JSON.parse(atob(offerString));
-    this.remoteInfo = offerData.info;
+    const offerData = decodeSignal(offerString);
+    this.remoteInfo = { id: randomId(), role: 'host', username: offerData.username };
 
     const configuration: RTCConfiguration = {
       iceServers: [
@@ -87,7 +90,7 @@ class WebRTCManager {
     this.setupPeerConnection();
 
     await this.peerConnection.setRemoteDescription(
-      new RTCSessionDescription(offerData.offer)
+      new RTCSessionDescription(offerData.description)
     );
 
     const answer = await this.peerConnection.createAnswer();
@@ -95,12 +98,7 @@ class WebRTCManager {
 
     await this.waitForICEGathering();
 
-    const answerData = {
-      answer: this.peerConnection.localDescription,
-      info: this.localInfo
-    };
-
-    return btoa(JSON.stringify(answerData));
+    return encodeSignal(this.peerConnection.localDescription!, username);
   }
 
   async processAnswer(answerString: string): Promise<void> {
@@ -108,11 +106,11 @@ class WebRTCManager {
       throw new Error('No peer connection');
     }
 
-    const answerData = JSON.parse(atob(answerString));
-    this.remoteInfo = answerData.info;
+    const answerData = decodeSignal(answerString);
+    this.remoteInfo = { id: randomId(), role: 'guest', username: answerData.username };
 
     await this.peerConnection.setRemoteDescription(
-      new RTCSessionDescription(answerData.answer)
+      new RTCSessionDescription(answerData.description)
     );
   }
 
@@ -123,9 +121,10 @@ class WebRTCManager {
       const state = this.peerConnection?.iceConnectionState;
       console.log('[WebRTC] ICE connection state:', state);
 
-      if (state === 'connected') {
-        this.setConnectionState('connected');
-      } else if (state === 'failed' || state === 'disconnected') {
+      // ICE can reach "connected" on the guest before the host has even scanned
+      // the answer (the host replies to connectivity checks), so "connected" is
+      // only reported once the data channel opens.
+      if (state === 'failed' || state === 'disconnected') {
         this.setConnectionState('failed');
       } else if (state === 'checking') {
         this.setConnectionState('connecting');

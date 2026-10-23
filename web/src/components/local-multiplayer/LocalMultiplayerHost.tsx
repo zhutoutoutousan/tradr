@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Html5Qrcode } from 'html5-qrcode';
+import type { Html5Qrcode } from 'html5-qrcode';
+import { createQrScanner, QR_SCAN_CONFIG } from '@/lib/p2p/qr-scanner';
 import { webrtcManager } from '@/lib/p2p/webrtc-manager';
 import type { ConnectionState } from '@/lib/p2p/webrtc-manager';
 
@@ -17,6 +18,7 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
   const [loading, setLoading] = useState(true);
   const [waitingForAnswer, setWaitingForAnswer] = useState(false);
   const [answerInput, setAnswerInput] = useState('');
+  const [answerSubmitted, setAnswerSubmitted] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [error, setError] = useState('');
   const [scanningAnswer, setScanningAnswer] = useState(false);
@@ -24,6 +26,7 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
   const [shouldStartAnswerScanner, setShouldStartAnswerScanner] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const answerQrReaderRef = useRef<HTMLDivElement>(null);
+  const scanHandledRef = useRef(false);
 
   useEffect(() => {
     async function createOffer() {
@@ -118,21 +121,21 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
           return;
         }
 
-        const scanner = new Html5Qrcode('answer-qr-reader');
+        const scanner = createQrScanner('answer-qr-reader');
         scannerRef.current = scanner;
+        scanHandledRef.current = false;
 
         await scanner.start(
           { facingMode: 'environment' },
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0,
-          },
-          async (decodedText) => {
+          QR_SCAN_CONFIG,
+          (decodedText) => {
+            // The scanner keeps firing every frame while the code is in view
+            if (scanHandledRef.current) return;
+            scanHandledRef.current = true;
             console.log('[LocalMP Host] Answer QR scanned successfully');
             setAnswerInput(decodedText);
-            await handleAnswerCode(decodedText);
             stopScanningAnswer();
+            handleAnswerCode(decodedText);
           },
           (errorMessage) => {
             // Ignore scanning errors
@@ -184,6 +187,7 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
 
     try {
       await webrtcManager.processAnswer(code.trim());
+      setAnswerSubmitted(true);
       console.log('[LocalMP Host] Answer processed, waiting for connection...');
     } catch (err) {
       console.error('[LocalMP Host] Failed to process answer:', err);
@@ -229,7 +233,7 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
     );
   }
 
-  if (connectionState === 'connecting') {
+  if (connectionState === 'connecting' && answerSubmitted) {
     return (
       <div className="flex flex-col items-center justify-center p-8">
         <div className="animate-pulse text-4xl mb-4">🔗</div>
@@ -268,8 +272,8 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
       <div className="bg-white p-6 rounded-lg mb-6 shadow-lg">
         <QRCodeSVG
           value={offerCode}
-          size={256}
-          level="M"
+          size={288}
+          level="L"
           includeMargin={true}
         />
       </div>

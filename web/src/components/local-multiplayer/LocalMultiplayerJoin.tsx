@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Html5Qrcode } from 'html5-qrcode';
+import type { Html5Qrcode } from 'html5-qrcode';
+import { createQrScanner, QR_SCAN_CONFIG } from '@/lib/p2p/qr-scanner';
 import { webrtcManager } from '@/lib/p2p/webrtc-manager';
 import type { ConnectionState } from '@/lib/p2p/webrtc-manager';
 
@@ -24,6 +25,7 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
   const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
   const [shouldStartScanner, setShouldStartScanner] = useState(false);
   const qrReaderRef = useRef<HTMLDivElement>(null);
+  const scanHandledRef = useRef(false);
 
   useEffect(() => {
     const unsubscribe = webrtcManager.onStateChange((state) => {
@@ -107,20 +109,20 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
         }
 
         console.log('[LocalMP Join] Starting QR scanner...');
-        const scanner = new Html5Qrcode('qr-reader');
+        const scanner = createQrScanner('qr-reader');
         scannerRef.current = scanner;
+        scanHandledRef.current = false;
 
         await scanner.start(
           { facingMode: 'environment' },
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0,
-          },
-          async (decodedText) => {
+          QR_SCAN_CONFIG,
+          (decodedText) => {
+            // The scanner keeps firing every frame while the code is in view
+            if (scanHandledRef.current) return;
+            scanHandledRef.current = true;
             console.log('[LocalMP Join] QR code scanned successfully');
-            await handleOfferCode(decodedText);
             stopScanning();
+            handleOfferCode(decodedText);
           },
           (errorMessage) => {
             // Ignore frequent scanning errors (not finding QR codes)
@@ -209,7 +211,7 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
     }
   };
 
-  if (connectionState === 'connecting') {
+  if (connectionState === 'connecting' && !answerCode) {
     return (
       <div className="flex flex-col items-center justify-center p-8">
         <div className="animate-pulse text-4xl mb-4">🔗</div>
@@ -233,8 +235,8 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
         <div className="bg-white p-6 rounded-lg mb-6 shadow-lg">
           <QRCodeSVG
             value={answerCode}
-            size={256}
-            level="M"
+            size={288}
+            level="L"
             includeMargin={true}
           />
         </div>
@@ -350,7 +352,13 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
       {/* QR Scanner */}
       {!manualMode && (
         <div className="w-full max-w-md">
-          {!shouldStartScanner ? (
+          {loading ? (
+            <div className="bg-slate-800/50 rounded-lg p-8 border border-emerald-600/50 text-center">
+              <div className="mb-4 h-10 w-10 mx-auto animate-spin rounded-full border-4 border-slate-700 border-t-emerald-500" />
+              <p className="text-emerald-300 font-semibold">✅ QR-Code erkannt</p>
+              <p className="text-sm text-slate-400 mt-1">Antwort-Code wird erstellt...</p>
+            </div>
+          ) : !shouldStartScanner ? (
             <div className="bg-slate-800/50 rounded-lg p-8 border border-slate-700">
               <div className="text-center mb-4">
                 <div className="text-6xl mb-4">📷</div>
