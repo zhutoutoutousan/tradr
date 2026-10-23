@@ -60,7 +60,7 @@ export function buildMultiplayerReview(
   const seed = roundNumber > 0 ? `${room}:${roundNumber}` : room;
 
   return {
-    id: `mp-${room}-r${roundNumber}-${Date.now()}`,
+    id: `mp-${room}-r${roundNumber}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     createdAt: Date.now(),
     marketId,
     marketLabel: `${marketLabel} · room ${room}`,
