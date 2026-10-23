@@ -32,21 +32,23 @@ function clock(ms: number) {
 const ORDINAL = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
 
 // Bump on each deploy so a stale cached build is obvious on every device.
-const BUILD_TAG = "v3.12.2-round-sync";
+const BUILD_TAG = "v3.12.3-room-qr";
 
 export default function MultiplayerGame({
   room,
   name,
   role = "player",
   onLeave,
+  onBecomePlayer,
 }: {
   room: string;
   name: string;
   role?: MpRole;
   onLeave: () => void;
+  onBecomePlayer?: () => void;
 }) {
   const session = useMultiplayer(room, name, role);
-  return <MultiplayerGameView room={room} onLeave={onLeave} session={session} />;
+  return <MultiplayerGameView room={room} onLeave={onLeave} session={session} onBecomePlayer={onBecomePlayer} />;
 }
 
 /** Race UI shared by online rooms and the offline (WebRTC) local game. */
@@ -56,6 +58,7 @@ export function MultiplayerGameView({
   session,
   local = false,
   lobbyExtra,
+  onBecomePlayer,
 }: {
   room: string;
   onLeave: () => void;
@@ -63,6 +66,8 @@ export function MultiplayerGameView({
   local?: boolean;
   /** Extra controls shown in the lobby (e.g. adding local players). */
   lobbyExtra?: ReactNode;
+  /** Observers can switch to trading while the room is in the lobby. */
+  onBecomePlayer?: () => void;
 }) {
   const {
     phase,
@@ -73,6 +78,7 @@ export function MultiplayerGameView({
     playerCount,
     traderCount,
     spectatorCount,
+    spectators,
     isHost,
     isSpectator,
     start,
@@ -373,6 +379,7 @@ export function MultiplayerGameView({
                     <div className="mt-4 w-full max-w-xs rounded-lg border border-slate-700 bg-slate-900/70 p-3">
                       <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">
                         In this room · {humanCount}
+                        {spectators.length > 0 && ` · ${spectators.length} watching`}
                       </div>
                       <div className="space-y-1.5">
                         {humans.map((h) => (
@@ -381,7 +388,24 @@ export function MultiplayerGameView({
                             <span className="truncate">{h.name}</span>
                           </div>
                         ))}
+                        {spectators.map((sp) => (
+                          <div key={sp.id} className="flex items-center gap-2 text-sm text-slate-400" data-testid="lobby-observer">
+                            <span className="w-2.5 shrink-0 text-center text-[10px]">👀</span>
+                            <span className="truncate">{sp.name}</span>
+                            <span className="ml-auto text-[10px] uppercase tracking-wide text-violet-300/80">observer</span>
+                          </div>
+                        ))}
                       </div>
+                      {isSpectator && onBecomePlayer && (
+                        <button
+                          type="button"
+                          onClick={onBecomePlayer}
+                          data-testid="become-player"
+                          className="mt-3 w-full rounded-md bg-emerald-500/90 py-2 text-sm font-bold text-slate-950 hover:bg-emerald-400"
+                        >
+                          Join the race as a trader
+                        </button>
+                      )}
                       {humanCount === 1 && (
                         <div className="mt-2 text-xs text-amber-400/90">
                           {local
@@ -500,7 +524,7 @@ export function MultiplayerGameView({
               className="shrink-0"
             />
           )}
-          {!local && <ShareButtons room={room} spectateInvite compact />}
+          {!local && <ShareButtons room={room} compact />}
         </aside>
       </main>
 

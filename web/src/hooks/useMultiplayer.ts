@@ -136,6 +136,17 @@ function buildSyntheticEngine(room: string, roundNumber = 0): GameEngine {
   return new GameEngine(new Market({ ...DEFAULT_MARKET, seed: roomSeed(room, roundNumber) }));
 }
 
+async function clearStaleChannels(sb: NonNullable<typeof supabase>, topic: string): Promise<void> {
+  const stale = () => sb.getChannels().filter((c) => c.topic === topic);
+  for (const c of stale()) void sb.removeChannel(c);
+  const deadline = Date.now() + 5000;
+  while (stale().length > 0 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100));
+  for (const c of stale()) {
+    c.teardown();
+    (sb.realtime as unknown as { _remove(c: unknown): void })._remove(c);
+  }
+}
+
 export function useMultiplayer(room: string, name: string, role: MpRole = "player") {
   const engineRef = useRef<GameEngine | null>(null);
   const roundNumberRef = useRef(0);
@@ -171,7 +182,6 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
   const enterRoundRef = useRef<(rn: number) => void>(() => {});
   const subscribedRef = useRef(false);
   const isHostRef = useRef(false);
-  const [reconnect, setReconnect] = useState(0);
 
   const [phase, setPhase] = useState<MpPhase>(supabaseEnabled ? "connecting" : "disabled");
   const [snapshot, setSnapshot] = useState<MpSnapshot | null>(null);
@@ -185,6 +195,7 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [danmaku, setDanmaku] = useState<DanmakuItem[]>([]);
   const [spectatorCount, setSpectatorCount] = useState(0);
+  const [spectators, setSpectators] = useState<{ id: string; name: string }[]>([]);
   const [traderCount, setTraderCount] = useState(1);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [roundNumber, setRoundNumber] = useState(0);
@@ -311,13 +322,8 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
     void heartbeatActiveRoom(room, traders, spectators);
   }, [room]);
 
-  // Connect to the realtime room.
-  useEffect(() => {
-    if (!supabaseEnabled || !supabase) {
-      setPhase("disabled");
-      return;
-    }
-    const sb = supabase;
+  const connect = useCallback(
+    (sb: NonNullable<typeof supabase>) => {
     const ch = sb.channel(`tradr-room:${room}`, {
       config: { presence: { key: myIdRef.current } },
     });
@@ -408,6 +414,11 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
       setPlayerCount(ids.length || 1);
       setTraderCount(ids.filter((id) => (flat[id]?.role ?? "player") === "player").length || 1);
       setSpectatorCount(ids.filter((id) => flat[id]?.role === "spectator").length);
+      setSpectators(
+        ids
+          .filter((id) => flat[id]?.role === "spectator")
+          .map((id) => ({ id, name: id === myIdRef.current ? `${flat[id]?.name ?? name} (you)` : flat[id]?.name ?? "Observer" })),
+      );
 
       // Host = earliest joiner (ties broken by id) and is the source of truth
       // for the chosen instrument.
@@ -490,19 +501,16 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
       publishActiveRoom();
     });
 
-    let retry = 0;
+    // supabase-js rejoins errored / timed-out channels by itself and reports SUBSCRIBED again.
     ch.subscribe((status) => {
       if (status === "SUBSCRIBED") {
         subscribedRef.current = true;
         pushPresence();
         publishActiveRoom();
         setPhase((p) => (p === "connecting" ? "lobby" : p));
-      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+      } else {
         subscribedRef.current = false;
-        if (channelRef.current !== ch) return;
-        console.warn(`[MP] realtime channel ${status}, reconnecting`);
-        window.clearTimeout(retry);
-        retry = window.setTimeout(() => setReconnect((n) => n + 1), 2000);
+        console.warn(`[MP] realtime channel ${status}`);
       }
     });
 
@@ -522,25 +530,39 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
       });
     }, 3000);
 
-    const onVisible = () => {
-      if (document.visibilityState === "visible" && channelRef.current === ch && !subscribedRef.current) {
-        setReconnect((n) => n + 1);
-      }
-    };
-    document.addEventListener("visibilitychange", onVisible);
-
     const heartbeat = window.setInterval(publishActiveRoom, ROOM_HEARTBEAT_MS);
 
     return () => {
       window.clearInterval(heartbeat);
       window.clearInterval(lobbyBeat);
-      window.clearTimeout(retry);
-      document.removeEventListener("visibilitychange", onVisible);
       subscribedRef.current = false;
       channelRef.current = null;
-      sb.removeChannel(ch);
+      void sb.removeChannel(ch);
     };
-  }, [publishActiveRoom, room, pushPresence, reconnect]);
+    },
+    [publishActiveRoom, room, pushPresence],
+  );
+
+  // Connect to the realtime room.
+  useEffect(() => {
+    if (!supabaseEnabled || !supabase) {
+      setPhase("disabled");
+      return;
+    }
+    const sb = supabase;
+    let cancelled = false;
+    let teardown: (() => void) | null = null;
+    // supabase-js hands back an existing channel for the same topic, and when that
+    // old channel finally closes it drops every channel with the topic from its
+    // routing list. So a re-entered room must wait for the previous channel to go.
+    void clearStaleChannels(sb, `realtime:tradr-room:${room}`).then(() => {
+      if (!cancelled) teardown = connect(sb);
+    });
+    return () => {
+      cancelled = true;
+      teardown?.();
+    };
+  }, [connect, room]);
 
   const publishTrades = useCallback(
     (events: ReplayEvent[]) => {
@@ -980,6 +1002,7 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
     playerCount,
     traderCount,
     spectatorCount,
+    spectators,
     isHost,
     role,
     isSpectator: role === "spectator",

@@ -706,6 +706,7 @@ export function useLocalMultiplayer(name: string, isHost: boolean, initialPeerNa
     playerCount: humans,
     traderCount: humans,
     spectatorCount: 0,
+    spectators: [],
     isHost,
     role: "player",
     isSpectator: false,

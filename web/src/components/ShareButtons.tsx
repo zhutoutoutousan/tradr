@@ -226,7 +226,7 @@ function QRShareModal({
 
           {/* QR Code */}
           <div className="flex flex-col items-center space-y-3">
-            <div className="bg-white p-3 sm:p-4 rounded-xl inline-block">
+            <div className="bg-white p-3 sm:p-4 rounded-xl inline-block" data-testid="share-qr" data-url={url}>
               <QRCodeSVG 
                 id="qr-code-svg" 
                 value={url} 
