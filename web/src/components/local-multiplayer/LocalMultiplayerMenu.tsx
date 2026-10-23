@@ -7,7 +7,7 @@ import { LocalMultiplayerJoin } from './LocalMultiplayerJoin';
 type LocalMultiplayerMode = 'menu' | 'host' | 'join' | 'playing';
 
 interface LocalMultiplayerMenuProps {
-  onStartGame: (isHost: boolean, remoteUsername: string) => void;
+  onStartGame: (isHost: boolean, remoteUsername: string, username: string) => void;
   onCancel: () => void;
 }
 
@@ -46,7 +46,7 @@ export function LocalMultiplayerMenu({ onStartGame, onCancel }: LocalMultiplayer
     setMode('playing');
     
     setTimeout(() => {
-      onStartGame(isHost, remoteUsername);
+      onStartGame(isHost, remoteUsername, username);
     }, 1000);
   };
 

@@ -71,8 +71,41 @@ const connected = await Promise.all([
   guest.page.waitForEvent('console', { predicate: (m) => m.text().includes('Data channel open'), timeout: 30000 }).then(() => true, () => false),
 ]);
 console.log(`host connected: ${connected[0]}, guest connected: ${connected[1]}`);
-await host.page.waitForTimeout(1500);
+
+// After connecting, the shared race must actually load and start on both devices.
+const startBtn = await host.page.waitForSelector('button:has-text("Start 3-minute race")', { timeout: 15000 }).then(() => true, () => false);
+console.log(`host lobby with start button: ${startBtn}`);
+let raceOk = false;
+if (startBtn) {
+  await guest.page.waitForSelector('text=Waiting for the host to start', { timeout: 15000 });
+  await host.page.click('button:has-text("Start 3-minute race")');
+  const live = await Promise.all([host.page, guest.page].map((p) =>
+    p.waitForSelector('text=/Live · bar/', { timeout: 15000 }).then(() => true, () => false)));
+  console.log(`race running on host: ${live[0]}, guest: ${live[1]}`);
+  await guest.page.keyboard.press('b');
+  const chatTo = async (from, to, text) => {
+    const open = from.locator('button[aria-label="Open chat"]');
+    if (await open.isVisible().catch(() => false)) await open.click();
+    const input = from.locator('input[placeholder^="Message"]:visible').first();
+    await input.fill(text);
+    await input.press('Enter');
+    return to.waitForFunction((t) => document.body.textContent.includes(t), text, { timeout: 8000 }).then(() => true, () => false);
+  };
+  const chatArrived = (await chatTo(guest.page, host.page, 'hallo vom gast')) && (await chatTo(host.page, guest.page, 'hallo vom host'));
+  const hostBoard = await host.page.textContent('body');
+  const guestBoard = await guest.page.textContent('body');
+  const seeEachOther = hostBoard.includes('GuestPhone') && guestBoard.includes('HostPhone');
+  const sameBar = await Promise.all([host.page, guest.page].map((p) => p.textContent('text=/Live · bar \\d+/')));
+  console.log(`see each other: ${seeEachOther}, chat both ways: ${chatArrived}, bars: ${sameBar.join(' / ')}`);
+  raceOk = live.every(Boolean) && seeEachOther && chatArrived;
+  if (raceOk && process.env.FULL) {
+    const over = await Promise.all([host.page, guest.page].map((p) =>
+      p.waitForSelector('[data-testid="mp-game-over"]', { timeout: 200000 }).then(() => true, () => false)));
+    console.log(`results on host: ${over[0]}, guest: ${over[1]}`);
+    raceOk = over.every(Boolean);
+  }
+}
 await host.page.screenshot({ path: '/tmp/host-after.png' });
 await guest.page.screenshot({ path: '/tmp/guest-after.png' });
 await Promise.all([host.browser.close(), guest.browser.close()]);
-process.exit(connected.every(Boolean) ? 0 : 1);
+process.exit(connected.every(Boolean) && raceOk ? 0 : 1);

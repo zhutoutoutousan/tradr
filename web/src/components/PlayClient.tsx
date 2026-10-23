@@ -7,6 +7,8 @@ import LandingIntro from "@/components/LandingIntro";
 import ModeSelect, { type GameMode } from "@/components/ModeSelect";
 import MultiplayerJoin from "@/components/MultiplayerJoin";
 import { LocalMultiplayerMenu } from "@/components/local-multiplayer/LocalMultiplayerMenu";
+import { LocalMultiplayerGame } from "@/components/local-multiplayer/LocalMultiplayerGame";
+import { webrtcManager } from "@/lib/p2p/webrtc-manager";
 import SuggestRegisterModal from "@/components/SuggestRegisterModal";
 import type { GameConfig, RoundResult } from "@/hooks/useGame";
 import type { Candle } from "@/lib/sim/types";
@@ -34,6 +36,7 @@ export default function PlayClient() {
   const [ready, setReady] = useState(false);
   const [phase, setPhase] = useState<Phase>("boot");
   const [gameMode, setGameMode] = useState<GameMode | null>(null);
+  const [localGame, setLocalGame] = useState<{ isHost: boolean; remoteUsername: string; username: string } | null>(null);
   const [seed, setSeed] = useState(0);
   const [markets, setMarkets] = useState<MarketOption[]>([]);
   const [setup, setSetup] = useState<RoundSetup | null>(null);
@@ -185,13 +188,21 @@ export default function PlayClient() {
   }
 
   if (gameMode === "local-multiplayer") {
+    if (localGame) {
+      return (
+        <LocalMultiplayerGame
+          {...localGame}
+          onLeave={() => {
+            webrtcManager.disconnect();
+            setLocalGame(null);
+            backToMode();
+          }}
+        />
+      );
+    }
     return (
       <LocalMultiplayerMenu
-        onStartGame={(isHost, remoteUsername) => {
-          console.log('[Local MP] Game starting', { isHost, remoteUsername });
-          // TODO: Implement local multiplayer game logic
-          // For now, just show a message
-        }}
+        onStartGame={(isHost, remoteUsername, username) => setLocalGame({ isHost, remoteUsername, username })}
         onCancel={backToMode}
       />
     );

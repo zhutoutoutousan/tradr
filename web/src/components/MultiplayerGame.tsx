@@ -9,6 +9,7 @@ import RoomQRShare from "@/components/RoomQRShare";
 import ShareButtons from "@/components/ShareButtons";
 import RoundAccountInfo from "@/components/RoundAccountInfo";
 import { useMultiplayer, type MpRole } from "@/hooks/useMultiplayer";
+import type { MpSession } from "@/hooks/useLocalMultiplayer";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
 function money(n: number) {
@@ -37,7 +38,7 @@ const KIND_LABELS: Record<string, string> = {
 };
 
 // Bump on each deploy so a stale cached build is obvious on every device.
-const BUILD_TAG = "v3.10.0-replays";
+const BUILD_TAG = "v3.11.0-local-race";
 
 export default function MultiplayerGame({
   room,
@@ -49,6 +50,22 @@ export default function MultiplayerGame({
   name: string;
   role?: MpRole;
   onLeave: () => void;
+}) {
+  const session = useMultiplayer(room, name, role);
+  return <MultiplayerGameView room={room} onLeave={onLeave} session={session} />;
+}
+
+/** Race UI shared by online rooms and the offline (WebRTC) local game. */
+export function MultiplayerGameView({
+  room,
+  onLeave,
+  session,
+  local = false,
+}: {
+  room: string;
+  onLeave: () => void;
+  session: MpSession;
+  local?: boolean;
 }) {
   const {
     phase,
@@ -74,7 +91,7 @@ export default function MultiplayerGame({
     saveStatus,
     replayId,
     accountResult,
-  } = useMultiplayer(room, name, role);
+  } = session;
 
   const running = phase === "running" && !isSpectator;
   const canTrade = phase === "running" && !isSpectator;
@@ -218,7 +235,9 @@ export default function MultiplayerGame({
           <Link href="/" className="font-bold tracking-tight text-emerald-400">
             ◆ Tradr
           </Link>
-          <span className="rounded bg-slate-800 px-2 py-1 font-mono text-sm text-emerald-300">room {room}</span>
+          <span className="rounded bg-slate-800 px-2 py-1 font-mono text-sm text-emerald-300">
+            {local ? "✈️ Lokal" : `room ${room}`}
+          </span>
           <span className="rounded bg-slate-800/60 px-1.5 py-0.5 font-mono text-[10px] text-slate-500" title="build version">
             {BUILD_TAG}
           </span>
@@ -298,10 +317,14 @@ export default function MultiplayerGame({
               )}
             </div>
           )}
-          <button onClick={copyInvite} className="rounded-md bg-slate-800 px-3 py-1.5 text-sm hover:bg-slate-700">
-            {copied ? "✓ Copied" : "Invite"}
-          </button>
-          <RoomQRShare room={room} />
+          {!local && (
+            <>
+              <button onClick={copyInvite} className="rounded-md bg-slate-800 px-3 py-1.5 text-sm hover:bg-slate-700">
+                {copied ? "✓ Copied" : "Invite"}
+              </button>
+              <RoomQRShare room={room} />
+            </>
+          )}
           <button onClick={onLeave} className="rounded-md bg-slate-800 px-3 py-1.5 text-sm hover:bg-slate-700">
             Leave
           </button>
@@ -355,8 +378,14 @@ export default function MultiplayerGame({
                   <div className="flex flex-col items-center text-center">
                     <div className="text-lg font-semibold">Waiting in the lobby</div>
                     <div className="mt-1 max-w-sm text-sm text-slate-400">
-                      Share room code <span className="font-mono text-emerald-300">{room}</span> with friends. Everyone
-                      trades the exact same market.
+                      {local ? (
+                        "Direkt verbunden, ohne Internet. Ihr handelt beide exakt denselben Markt."
+                      ) : (
+                        <>
+                          Share room code <span className="font-mono text-emerald-300">{room}</span> with friends.
+                          Everyone trades the exact same market.
+                        </>
+                      )}
                     </div>
 
                     <div className="mt-4 w-full max-w-xs rounded-lg border border-slate-700 bg-slate-900/70 p-3">
@@ -373,11 +402,14 @@ export default function MultiplayerGame({
                       </div>
                       {humanCount === 1 && (
                         <div className="mt-2 text-xs text-amber-400/90">
-                          Only you so far — send the invite link and have them open it fresh.
+                          {local
+                            ? "Verbindung zum Mitspieler unterbrochen."
+                            : "Only you so far — send the invite link and have them open it fresh."}
                         </div>
                       )}
                     </div>
 
+                    {!local && (
                     <div className="mt-4 flex flex-col items-center gap-1">
                       <span className="text-xs uppercase tracking-wide text-slate-500">Instrument</span>
                       {instrumentPicker}
@@ -389,13 +421,16 @@ export default function MultiplayerGame({
                             : "Set by the host"}
                       </span>
                     </div>
+                    )}
 
-                    <button
-                      onClick={copyInvite}
-                      className="mt-3 rounded-lg border border-slate-700 px-4 py-2 text-sm hover:bg-slate-800"
-                    >
-                      {copied ? "✓ Invite link copied" : "Copy invite link"}
-                    </button>
+                    {!local && (
+                      <button
+                        onClick={copyInvite}
+                        className="mt-3 rounded-lg border border-slate-700 px-4 py-2 text-sm hover:bg-slate-800"
+                      >
+                        {copied ? "✓ Invite link copied" : "Copy invite link"}
+                      </button>
+                    )}
                     {isHost ? (
                       <button
                         onClick={start}
@@ -471,7 +506,7 @@ export default function MultiplayerGame({
               className="shrink-0"
             />
           )}
-          <ShareButtons room={room} spectateInvite compact />
+          {!local && <ShareButtons room={room} spectateInvite compact />}
         </aside>
       </main>
 
@@ -538,17 +573,20 @@ export default function MultiplayerGame({
 
             {!isSpectator && (
               <p className="mt-3 text-center text-xs text-slate-500">
-                {saveStatus === "saving" && "Saving run to community…"}
-                {saveStatus === "saved" && "Run saved to community gallery."}
-                {saveStatus === "error" && "Could not save run — check connection and try another round."}
+                {saveStatus === "saving" && (local ? "Speichere Runde…" : "Saving run to community…")}
+                {saveStatus === "saved" && (local ? "Runde gespeichert." : "Run saved to community gallery.")}
+                {saveStatus === "error" &&
+                  (local ? "Ohne Internet nicht gespeichert." : "Could not save run — check connection and try another round.")}
               </p>
             )}
 
             <RoundAccountInfo replayId={replayId} accountResult={accountResult} />
 
-            <div className="mt-4">
-              <ShareButtons room={room} rank={overallRank} returnPct={isSpectator ? undefined : me.returnPct} />
-            </div>
+            {!local && (
+              <div className="mt-4">
+                <ShareButtons room={room} rank={overallRank} returnPct={isSpectator ? undefined : me.returnPct} />
+              </div>
+            )}
 
             <div className="mt-5 flex flex-wrap gap-3">
               {isHost ? (
