@@ -20,14 +20,14 @@ function AuthCallbackContent() {
         if (!code) {
           console.error('[Auth Callback] No code in URL');
           setError('No authorization code found');
-          router.push('/register?error=no_code');
+          window.location.href = '/register?error=no_code';
           return;
         }
 
         if (!supabase) {
           console.error('[Auth Callback] Supabase not configured');
           setError('Supabase not configured');
-          router.push('/register?error=config_error');
+          window.location.href = '/register?error=config_error';
           return;
         }
 
@@ -38,14 +38,14 @@ function AuthCallbackContent() {
         if (exchangeError) {
           console.error('[Auth Callback] Exchange error:', exchangeError);
           setError(exchangeError.message);
-          router.push('/register?error=exchange_failed');
+          window.location.href = '/register?error=exchange_failed';
           return;
         }
 
         if (!data.session) {
           console.error('[Auth Callback] No session returned');
           setError('No session created');
-          router.push('/register?error=no_session');
+          window.location.href = '/register?error=no_session';
           return;
         }
 
@@ -85,14 +85,14 @@ function AuthCallbackContent() {
         // Wait a moment for state to propagate
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        // Redirect to play page
-        console.log('[Auth Callback] Redirecting to /play');
-        router.push('/play');
+        // Force full page reload to ensure Supabase client picks up the new session
+        console.log('[Auth Callback] Redirecting to /play with full page reload');
+        window.location.href = '/play';
         
       } catch (err) {
         console.error('[Auth Callback] Unexpected error:', err);
         setError(err instanceof Error ? err.message : 'Unknown error');
-        router.push('/register?error=unexpected');
+        window.location.href = '/register?error=unexpected';
       }
     };
 
