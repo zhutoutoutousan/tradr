@@ -84,7 +84,7 @@ export default function MultiplayerJoin({
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Multiplayer</h1>
           <span className="rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-1 text-xs font-mono font-semibold text-emerald-400">
-            v3.12.1-lobby-fit
+            v3.12.2-round-sync
           </span>
         </div>
         <p className="mt-1 text-sm text-slate-400">3-minute race on the same live market. Play or watch as observer.</p>

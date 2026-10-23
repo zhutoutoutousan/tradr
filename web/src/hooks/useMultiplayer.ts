@@ -168,6 +168,10 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
   const myVoteRef = useRef<string | null>(null);
   const pickModeRef = useRef<PickMode>("vote");
   const instrumentsRef = useRef<InstrumentOption[]>([]);
+  const enterRoundRef = useRef<(rn: number) => void>(() => {});
+  const subscribedRef = useRef(false);
+  const isHostRef = useRef(false);
+  const [reconnect, setReconnect] = useState(0);
 
   const [phase, setPhase] = useState<MpPhase>(supabaseEnabled ? "connecting" : "disabled");
   const [snapshot, setSnapshot] = useState<MpSnapshot | null>(null);
@@ -270,6 +274,30 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
   );
   applyInstrumentRef.current = applyInstrument;
 
+  // Reset local state for round `rn` (rematch). Does not announce anything.
+  const enterRound = useCallback(
+    (rn: number) => {
+      roundNumberRef.current = rn;
+      setRoundNumber(rn);
+      startEpochRef.current = null;
+      savedRoundRef.current = false;
+      recorderRef.current = null;
+      setReplayId(null);
+      setAccountResult(null);
+      setSaveStatus("idle");
+      roundCandlesRef.current = [];
+      if (instrumentRef.current === SYNTHETIC) {
+        engineRef.current = buildSyntheticEngine(room, rn);
+        roundCandlesRef.current = engineRef.current.market.candles.map((c) => ({ ...c }));
+      } else {
+        applyInstrument(instrumentRef.current, instrumentVersionRef.current);
+      }
+      setPhase("lobby");
+    },
+    [applyInstrument, room],
+  );
+  enterRoundRef.current = enterRound;
+
   const publishActiveRoom = useCallback(() => {
     const flat = presenceRef.current;
     let traders = 0;
@@ -333,32 +361,30 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
         startEpoch?: number | null;
         rematch?: boolean;
         roundNumber?: number;
+        pickMode?: PickMode;
       };
-      if (p?.rematch) {
+      if (!p) return;
+      if (p.rematch) {
         const rn = p.roundNumber ?? roundNumberRef.current + 1;
-        roundNumberRef.current = rn;
-        setRoundNumber(rn);
-        startEpochRef.current = null;
-        savedRoundRef.current = false;
-        recorderRef.current = null;
-        setReplayId(null);
-        setAccountResult(null);
-        setSaveStatus("idle");
-        roundCandlesRef.current = [];
-        if (instrumentRef.current === SYNTHETIC) {
-          engineRef.current = buildSyntheticEngine(room, rn);
-          roundCandlesRef.current = engineRef.current.market.candles.map((c) => ({ ...c }));
-        } else {
-          applyInstrumentRef.current(instrumentRef.current, instrumentVersionRef.current);
-        }
-        setPhase("lobby");
+        if (rn <= roundNumberRef.current && startEpochRef.current == null) return;
+        enterRoundRef.current(rn);
         pushPresence({ startEpoch: null, roundNumber: rn });
         return;
       }
-      if (p?.instrument && (p.instrumentVersion ?? 0) > instrumentVersionRef.current) {
+      // Messages from a round we haven't reached yet (missed the rematch) move us there first.
+      const rn = p.roundNumber ?? roundNumberRef.current;
+      if (rn > roundNumberRef.current) {
+        enterRoundRef.current(rn);
+        pushPresence({ startEpoch: null, roundNumber: rn });
+      }
+      if (p.pickMode && !isHostRef.current && p.pickMode !== pickModeRef.current) {
+        pickModeRef.current = p.pickMode;
+        setPickModeState(p.pickMode);
+      }
+      if (p.instrument && (p.instrumentVersion ?? 0) > instrumentVersionRef.current) {
         applyInstrumentRef.current(p.instrument, p.instrumentVersion ?? 0);
       }
-      if (p?.startEpoch != null && startEpochRef.current == null) {
+      if (p.startEpoch != null && startEpochRef.current == null && rn === roundNumberRef.current) {
         startEpochRef.current = p.startEpoch;
         pushPresence({ startEpoch: p.startEpoch });
       }
@@ -372,7 +398,6 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
         const meta = state[key][0];
         if (!meta) continue;
         flat[key] = meta;
-        if (meta.startEpoch != null) minStart = minStart == null ? meta.startEpoch : Math.min(minStart, meta.startEpoch);
       }
       presenceRef.current = flat;
       // Drop live stats for players who have left.
@@ -396,6 +421,19 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
         }
       }
       setIsHost(hostId === myIdRef.current);
+      isHostRef.current = hostId === myIdRef.current;
+      // Follow the host into a newer round if its rematch broadcast was missed.
+      const hostRound = flat[hostId]?.roundNumber ?? 0;
+      if (hostId !== myIdRef.current && hostRound > roundNumberRef.current) {
+        enterRoundRef.current(hostRound);
+        pushPresence({ startEpoch: null, roundNumber: hostRound });
+      }
+      // Only start times proposed for the current round count; stale ones from the
+      // previous round would otherwise end the new round before it begins.
+      for (const meta of Object.values(flat)) {
+        if (meta.startEpoch == null || (meta.roundNumber ?? 0) !== roundNumberRef.current) continue;
+        minStart = minStart == null ? meta.startEpoch : Math.min(minStart, meta.startEpoch);
+      }
       const hostMode = flat[hostId]?.pickMode;
       if (hostMode && hostId !== myIdRef.current) {
         pickModeRef.current = hostMode;
@@ -452,22 +490,57 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
       publishActiveRoom();
     });
 
+    let retry = 0;
     ch.subscribe((status) => {
       if (status === "SUBSCRIBED") {
+        subscribedRef.current = true;
         pushPresence();
         publishActiveRoom();
         setPhase((p) => (p === "connecting" ? "lobby" : p));
+      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        subscribedRef.current = false;
+        if (channelRef.current !== ch) return;
+        console.warn(`[MP] realtime channel ${status}, reconnecting`);
+        window.clearTimeout(retry);
+        retry = window.setTimeout(() => setReconnect((n) => n + 1), 2000);
       }
     });
+
+    // Re-announce the lobby state so players who missed a broadcast catch up.
+    const lobbyBeat = window.setInterval(() => {
+      if (!isHostRef.current || !subscribedRef.current || roleRef.current !== "player") return;
+      ch.send({
+        type: "broadcast",
+        event: "control",
+        payload: {
+          roundNumber: roundNumberRef.current,
+          pickMode: pickModeRef.current,
+          startEpoch: startEpochRef.current,
+          instrument: instrumentRef.current,
+          instrumentVersion: instrumentVersionRef.current,
+        },
+      });
+    }, 3000);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && channelRef.current === ch && !subscribedRef.current) {
+        setReconnect((n) => n + 1);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
 
     const heartbeat = window.setInterval(publishActiveRoom, ROOM_HEARTBEAT_MS);
 
     return () => {
       window.clearInterval(heartbeat);
+      window.clearInterval(lobbyBeat);
+      window.clearTimeout(retry);
+      document.removeEventListener("visibilitychange", onVisible);
+      subscribedRef.current = false;
       channelRef.current = null;
       sb.removeChannel(ch);
     };
-  }, [publishActiveRoom, room, pushPresence]);
+  }, [publishActiveRoom, room, pushPresence, reconnect]);
 
   const publishTrades = useCallback(
     (events: ReplayEvent[]) => {
@@ -568,7 +641,7 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
       const pos = e.player.account.position;
       const retMe = ((eqMe - STARTING_BALANCE) / STARTING_BALANCE) * 100;
 
-      if (channelRef.current && roleRef.current === "player" && now - lastPushRef.current > 1000 / STATS_HZ) {
+      if (channelRef.current && subscribedRef.current && roleRef.current === "player" && now - lastPushRef.current > 1000 / STATS_HZ) {
         lastPushRef.current = now;
         channelRef.current.send({
           type: "broadcast",
@@ -687,6 +760,11 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
       pickModeRef.current = mode;
       setPickModeState(mode);
       pushPresence();
+      channelRef.current?.send({
+        type: "broadcast",
+        event: "control",
+        payload: { pickMode: mode, roundNumber: roundNumberRef.current },
+      });
     },
     [pushPresence],
   );
@@ -714,34 +792,23 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
     if (engineReadyRef.current) roundCandlesRef.current = engineRef.current!.market.candles.map((c) => ({ ...c }));
     const inst = changed ? { instrument: pick, instrumentVersion: version } : {};
     pushPresence({ startEpoch: epoch, ...inst });
-    channelRef.current?.send({ type: "broadcast", event: "control", payload: { startEpoch: epoch, ...inst } });
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "control",
+      payload: { startEpoch: epoch, roundNumber: roundNumberRef.current, ...inst },
+    });
   }, [applyInstrument, pushPresence]);
 
   const rematch = useCallback(() => {
     const rn = roundNumberRef.current + 1;
-    roundNumberRef.current = rn;
-    setRoundNumber(rn);
-    startEpochRef.current = null;
-    savedRoundRef.current = false;
-    recorderRef.current = null;
-    setReplayId(null);
-    setAccountResult(null);
-    setSaveStatus("idle");
-    roundCandlesRef.current = [];
-    if (instrumentRef.current === SYNTHETIC) {
-      engineRef.current = buildSyntheticEngine(room, rn);
-      roundCandlesRef.current = engineRef.current.market.candles.map((c) => ({ ...c }));
-    } else {
-      applyInstrument(instrumentRef.current, instrumentVersionRef.current);
-    }
-    setPhase("lobby");
+    enterRound(rn);
     pushPresence({ startEpoch: null, roundNumber: rn });
     channelRef.current?.send({
       type: "broadcast",
       event: "control",
       payload: { rematch: true, roundNumber: rn, startEpoch: null },
     });
-  }, [applyInstrument, pushPresence, room]);
+  }, [enterRound, pushPresence]);
 
   const sendChat = useCallback(
     (text: string) => {

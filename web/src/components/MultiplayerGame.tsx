@@ -32,7 +32,7 @@ function clock(ms: number) {
 const ORDINAL = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
 
 // Bump on each deploy so a stale cached build is obvious on every device.
-const BUILD_TAG = "v3.12.1-lobby-fit";
+const BUILD_TAG = "v3.12.2-round-sync";
 
 export default function MultiplayerGame({
   room,
