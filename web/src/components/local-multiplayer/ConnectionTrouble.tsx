@@ -31,6 +31,9 @@ function hints(d: ConnectionDiagnostics): string[] {
     out.push(
       `${d.local.total === 0 ? "Dieses Gerät" : "Das andere Gerät"} hat keine Netzwerkverbindung gefunden. Beide Geräte müssen im selben WLAN sein oder eines öffnet einen Hotspot (WLAN muss an sein).`,
     );
+    out.push(
+      "Nur Bluetooth eingeschaltet reicht nicht: Browser können nicht direkt über Bluetooth funken. Bluetooth geht nur als Bluetooth-Tethering (Android: Einstellungen → Hotspot & Tethering → Bluetooth-Tethering, das andere Gerät verbindet sich darüber).",
+    );
   }
   const mdnsOnly = (s: ConnectionDiagnostics["local"]) => s.total > 0 && s.mdns === s.total;
   if (mdnsOnly(d.local) || mdnsOnly(d.remote)) {
