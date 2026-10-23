@@ -18,6 +18,7 @@ import { ReplayRecorder } from "@/lib/replay/recorder";
 import { saveReplay } from "@/lib/replay/storage";
 import type { ReplayEvent } from "@/lib/replay/types";
 import { saveAccountGame, type AccountGameResult } from "@/lib/game/accountHistory";
+import { serverNow, syncServerClock } from "@/lib/serverClock";
 import {
   loadInstrumentIndex,
   tallyVotes,
@@ -32,6 +33,7 @@ const MS_PER_TICK = 1000 / 9; // must match the synthetic feed's intended speed
 const COUNTDOWN_MS = 4000;
 // Extra time for every client to download a newly drawn market before the start.
 const MARKET_LOAD_MS = 2500;
+const PRESENCE_GAP_MS = 6500;
 const ROUND_MS = 180_000; // 3-minute race, wall-clock synced from startEpoch
 const MAX_CATCHUP = 600;
 const STATS_HZ = 3;
@@ -61,6 +63,12 @@ export interface ChatMessage {
   userId: string;
   name: string;
   text: string;
+  at: number;
+}
+
+interface VoteBroadcast {
+  id: string;
+  vote: string | null;
   at: number;
 }
 
@@ -115,7 +123,10 @@ interface PresenceMeta {
   role: MpRole;
   roundNumber: number;
   vote?: string | null;
+  voteAt?: number;
   pickMode?: PickMode;
+  /** Who this member follows as host. The room creator claims itself; later joiners adopt it. */
+  host?: string | null;
 }
 
 interface LiveStats {
@@ -182,6 +193,12 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
   const enterRoundRef = useRef<(rn: number) => void>(() => {});
   const subscribedRef = useRef(false);
   const isHostRef = useRef(false);
+  const hostRef = useRef<string | null>(null);
+  const heardHostRef = useRef(false);
+  const myVoteAtRef = useRef(0);
+  const votesRef = useRef<Record<string, { vote: string | null; at: number }>>({});
+  const presenceTimerRef = useRef<number | null>(null);
+  const lastTrackRef = useRef(0);
 
   const [phase, setPhase] = useState<MpPhase>(supabaseEnabled ? "connecting" : "disabled");
   const [snapshot, setSnapshot] = useState<MpSnapshot | null>(null);
@@ -213,12 +230,16 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
     });
   }, []);
 
-  // Track stable membership info. Called sparingly (join / start / instrument
-  // change) — never on a tight interval.
-  const pushPresence = useCallback(
-    (partial: Partial<PresenceMeta> = {}) => {
+  // Supabase closes the channel ("Client presence rate limit exceeded") after 5
+  // presence updates in 30 s, so updates are coalesced and spaced out. Anything
+  // that must arrive promptly also goes out as a broadcast.
+  const pushPresence = useCallback(() => {
+    if (presenceTimerRef.current != null) return;
+    const flush = () => {
+      presenceTimerRef.current = null;
       const ch = channelRef.current;
-      if (!ch) return;
+      if (!ch || !subscribedRef.current) return;
+      lastTrackRef.current = Date.now();
       const meta: PresenceMeta = {
         name,
         joinedAt: joinedAtRef.current,
@@ -228,13 +249,35 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
         role: roleRef.current,
         roundNumber: roundNumberRef.current,
         vote: myVoteRef.current,
+        voteAt: myVoteAtRef.current,
         pickMode: pickModeRef.current,
-        ...partial,
+        host: hostRef.current,
       };
       ch.track(meta);
-    },
-    [name],
-  );
+    };
+    const wait = lastTrackRef.current + PRESENCE_GAP_MS - Date.now();
+    if (wait <= 0) flush();
+    else presenceTimerRef.current = window.setTimeout(flush, wait);
+  }, [name]);
+
+  const voteTally = useCallback(() => {
+    const flat = presenceRef.current;
+    return tallyVotes(
+      Object.keys(flat)
+        .filter((k) => (flat[k]?.role ?? "player") === "player")
+        .map((k) => (k === myIdRef.current ? myVoteRef.current : votesRef.current[k]?.vote ?? null)),
+    );
+  }, []);
+
+  const sendVote = useCallback(() => {
+    const ch = channelRef.current;
+    if (!ch || !subscribedRef.current || roleRef.current !== "player") return;
+    ch.send({
+      type: "broadcast",
+      event: "vote",
+      payload: { id: myIdRef.current, vote: myVoteRef.current, at: myVoteAtRef.current } as VoteBroadcast,
+    });
+  }, []);
 
   // Swap the active engine to a new instrument. Real markets are fetched async;
   // the engine is only swapped in once its candles are ready so the sim never
@@ -352,6 +395,15 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
       ]);
     });
 
+    ch.on("broadcast", { event: "vote" }, ({ payload }) => {
+      const p = payload as VoteBroadcast;
+      if (!p?.id || p.id === myIdRef.current) return;
+      const prev = votesRef.current[p.id];
+      if (prev && prev.at >= p.at) return;
+      votesRef.current[p.id] = { vote: p.vote ?? null, at: p.at };
+      setVoteCounts(voteTally());
+    });
+
     ch.on("broadcast", { event: "trade" }, ({ payload }) => {
       const p = payload as TradeBroadcast;
       const rec = recorderRef.current;
@@ -368,22 +420,26 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
         rematch?: boolean;
         roundNumber?: number;
         pickMode?: PickMode;
+        from?: string;
       };
       if (!p) return;
+      const fromHost = !p.from || p.from === hostRef.current;
+      if (p.from && fromHost) heardHostRef.current = true;
       if (p.rematch) {
+        if (!fromHost) return;
         const rn = p.roundNumber ?? roundNumberRef.current + 1;
         if (rn <= roundNumberRef.current && startEpochRef.current == null) return;
         enterRoundRef.current(rn);
-        pushPresence({ startEpoch: null, roundNumber: rn });
+        pushPresence();
         return;
       }
       // Messages from a round we haven't reached yet (missed the rematch) move us there first.
       const rn = p.roundNumber ?? roundNumberRef.current;
       if (rn > roundNumberRef.current) {
         enterRoundRef.current(rn);
-        pushPresence({ startEpoch: null, roundNumber: rn });
+        pushPresence();
       }
-      if (p.pickMode && !isHostRef.current && p.pickMode !== pickModeRef.current) {
+      if (p.pickMode && fromHost && !isHostRef.current && p.pickMode !== pickModeRef.current) {
         pickModeRef.current = p.pickMode;
         setPickModeState(p.pickMode);
       }
@@ -392,7 +448,7 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
       }
       if (p.startEpoch != null && startEpochRef.current == null && rn === roundNumberRef.current) {
         startEpochRef.current = p.startEpoch;
-        pushPresence({ startEpoch: p.startEpoch });
+        pushPresence();
       }
     });
 
@@ -420,24 +476,45 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
           .map((id) => ({ id, name: id === myIdRef.current ? `${flat[id]?.name ?? name} (you)` : flat[id]?.name ?? "Observer" })),
       );
 
-      // Host = earliest joiner (ties broken by id) and is the source of truth
-      // for the chosen instrument.
-      let hostId = myIdRef.current;
-      let best = flat[hostId]?.joinedAt ?? joinedAtRef.current;
-      for (const k of Object.keys(flat)) {
-        const j = flat[k].joinedAt;
-        if (j < best || (j === best && k < hostId)) {
-          best = j;
-          hostId = k;
+      // Host: the player most members follow (the room creator claims itself and
+      // later joiners adopt that). Device clocks play no part unless nobody claims.
+      const isPlayer = (id: string) => !!flat[id] && (flat[id].role ?? "player") === "player";
+      const claims: Record<string, number> = {};
+      for (const k of ids) {
+        const h = k === myIdRef.current ? hostRef.current : flat[k].host;
+        if (h && isPlayer(h)) claims[h] = (claims[h] ?? 0) + 1;
+      }
+      let hostId: string | null = null;
+      for (const [h, n] of Object.entries(claims)) {
+        if (hostId == null || n > claims[hostId] || (n === claims[hostId] && h < hostId)) hostId = h;
+      }
+      if (hostId == null) {
+        let best = Infinity;
+        for (const k of ids) {
+          if (!isPlayer(k)) continue;
+          const j = flat[k].joinedAt;
+          if (j < best || (j === best && hostId != null && k < hostId)) {
+            best = j;
+            hostId = k;
+          }
         }
       }
+      if (hostId == null && roleRef.current === "player") hostId = myIdRef.current;
+      // A member who only sees itself may simply not have received the others yet,
+      // so it acts as host without claiming; a claim made now would outvote the real host.
+      const alone = ids.filter(isPlayer).length <= 1 && !Object.keys(claims).length;
+      if (hostId !== hostRef.current && !alone) {
+        hostRef.current = hostId;
+        pushPresence();
+      }
+      hostId ??= "";
       setIsHost(hostId === myIdRef.current);
       isHostRef.current = hostId === myIdRef.current;
       // Follow the host into a newer round if its rematch broadcast was missed.
       const hostRound = flat[hostId]?.roundNumber ?? 0;
       if (hostId !== myIdRef.current && hostRound > roundNumberRef.current) {
         enterRoundRef.current(hostRound);
-        pushPresence({ startEpoch: null, roundNumber: hostRound });
+        pushPresence();
       }
       // Only start times proposed for the current round count; stale ones from the
       // previous round would otherwise end the new round before it begins.
@@ -445,18 +522,20 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
         if (meta.startEpoch == null || (meta.roundNumber ?? 0) !== roundNumberRef.current) continue;
         minStart = minStart == null ? meta.startEpoch : Math.min(minStart, meta.startEpoch);
       }
+      // Presence lags behind the host's broadcasts, so it only seeds the mode.
       const hostMode = flat[hostId]?.pickMode;
-      if (hostMode && hostId !== myIdRef.current) {
+      if (hostMode && hostId !== myIdRef.current && !heardHostRef.current) {
         pickModeRef.current = hostMode;
         setPickModeState(hostMode);
       }
-      setVoteCounts(
-        tallyVotes(
-          ids
-            .filter((id) => (flat[id]?.role ?? "player") === "player")
-            .map((id) => (id === myIdRef.current ? myVoteRef.current : flat[id]?.vote)),
-        ),
-      );
+      for (const k of ids) {
+        if (k === myIdRef.current) continue;
+        const at = flat[k].voteAt ?? 0;
+        const prev = votesRef.current[k];
+        if (!prev || at > prev.at) votesRef.current[k] = { vote: flat[k].vote ?? null, at };
+      }
+      for (const k of Object.keys(votesRef.current)) if (!flat[k]) delete votesRef.current[k];
+      setVoteCounts(voteTally());
 
       // Adopt the instrument with the newest version anywhere in the room. This
       // is independent of "host" detection, so a pick is never reverted by a
@@ -490,13 +569,13 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
 
       if (changed && bestInst) {
         applyInstrumentRef.current(bestInst, bestVer);
-        pushPresence({ instrument: bestInst, instrumentVersion: bestVer });
+        pushPresence();
       }
 
       // Adopt the earliest proposed start time.
       if (minStart != null && startEpochRef.current == null) {
         startEpochRef.current = minStart;
-        pushPresence({ startEpoch: minStart });
+        pushPresence();
       }
       publishActiveRoom();
     });
@@ -516,11 +595,14 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
 
     // Re-announce the lobby state so players who missed a broadcast catch up.
     const lobbyBeat = window.setInterval(() => {
-      if (!isHostRef.current || !subscribedRef.current || roleRef.current !== "player") return;
+      if (!subscribedRef.current || roleRef.current !== "player") return;
+      if (myVoteAtRef.current && startEpochRef.current == null) sendVote();
+      if (!isHostRef.current) return;
       ch.send({
         type: "broadcast",
         event: "control",
         payload: {
+          from: myIdRef.current,
           roundNumber: roundNumberRef.current,
           pickMode: pickModeRef.current,
           startEpoch: startEpochRef.current,
@@ -537,10 +619,12 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
       window.clearInterval(lobbyBeat);
       subscribedRef.current = false;
       channelRef.current = null;
+      if (presenceTimerRef.current != null) window.clearTimeout(presenceTimerRef.current);
+      presenceTimerRef.current = null;
       void sb.removeChannel(ch);
     };
     },
-    [publishActiveRoom, room, pushPresence],
+    [publishActiveRoom, room, pushPresence, sendVote, voteTally],
   );
 
   // Connect to the realtime room.
@@ -555,8 +639,10 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
     // supabase-js hands back an existing channel for the same topic, and when that
     // old channel finally closes it drops every channel with the topic from its
     // routing list. So a re-entered room must wait for the previous channel to go.
-    void clearStaleChannels(sb, `realtime:tradr-room:${room}`).then(() => {
-      if (!cancelled) teardown = connect(sb);
+    void Promise.all([clearStaleChannels(sb, `realtime:tradr-room:${room}`), syncServerClock()]).then(() => {
+      if (cancelled) return;
+      joinedAtRef.current = serverNow();
+      teardown = connect(sb);
     });
     return () => {
       cancelled = true;
@@ -617,7 +703,7 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
         return;
       }
       const start = startEpochRef.current;
-      const now = Date.now();
+      const now = serverNow();
 
       if (start != null) {
         if (now >= start) {
@@ -752,7 +838,7 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
       if (startEpochRef.current != null) return; // locked once the race is scheduled
       const version = Date.now();
       applyInstrument(id, version);
-      pushPresence({ instrument: id, instrumentVersion: version });
+      pushPresence();
       channelRef.current?.send({ type: "broadcast", event: "control", payload: { instrument: id, instrumentVersion: version } });
     },
     [applyInstrument, pushPresence],
@@ -763,29 +849,25 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
       if (startEpochRef.current != null || roleRef.current !== "player") return;
       const next = myVoteRef.current === id ? null : id;
       myVoteRef.current = next;
+      myVoteAtRef.current = Date.now();
       setMyVote(next);
+      sendVote();
       pushPresence();
-      const flat = presenceRef.current;
-      setVoteCounts(
-        tallyVotes(
-          Object.keys(flat)
-            .filter((k) => (flat[k]?.role ?? "player") === "player")
-            .map((k) => (k === myIdRef.current ? next : flat[k]?.vote)),
-        ),
-      );
+      setVoteCounts(voteTally());
     },
-    [pushPresence],
+    [pushPresence, sendVote, voteTally],
   );
 
   const setPickMode = useCallback(
     (mode: PickMode) => {
+      if (!isHostRef.current) return;
       pickModeRef.current = mode;
       setPickModeState(mode);
       pushPresence();
       channelRef.current?.send({
         type: "broadcast",
         event: "control",
-        payload: { pickMode: mode, roundNumber: roundNumberRef.current },
+        payload: { pickMode: mode, roundNumber: roundNumberRef.current, from: myIdRef.current },
       });
     },
     [pushPresence],
@@ -793,42 +875,35 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
 
   // Host: draw the market (weighted by votes, or the host's own pick) and schedule the race.
   const start = useCallback(() => {
-    if (startEpochRef.current != null) return;
-    const flat = presenceRef.current;
-    const counts =
-      pickModeRef.current === "host"
-        ? tallyVotes([myVoteRef.current])
-        : tallyVotes(
-            Object.keys(flat)
-              .filter((k) => (flat[k]?.role ?? "player") === "player")
-              .map((k) => (k === myIdRef.current ? myVoteRef.current : flat[k]?.vote)),
-          );
+    if (startEpochRef.current != null || !isHostRef.current) return;
+    const counts = pickModeRef.current === "host" ? tallyVotes([myVoteRef.current]) : voteTally();
     const pick = weightedPick(counts, instrumentsRef.current);
     const changed = pick !== instrumentRef.current;
     const version = Date.now();
     if (changed) applyInstrument(pick, version);
-    const epoch = Date.now() + COUNTDOWN_MS + (changed ? MARKET_LOAD_MS : 0);
+    const epoch = serverNow() + COUNTDOWN_MS + (changed ? MARKET_LOAD_MS : 0);
     startEpochRef.current = epoch;
     savedRoundRef.current = false;
     setSaveStatus("idle");
     if (engineReadyRef.current) roundCandlesRef.current = engineRef.current!.market.candles.map((c) => ({ ...c }));
     const inst = changed ? { instrument: pick, instrumentVersion: version } : {};
-    pushPresence({ startEpoch: epoch, ...inst });
+    pushPresence();
     channelRef.current?.send({
       type: "broadcast",
       event: "control",
-      payload: { startEpoch: epoch, roundNumber: roundNumberRef.current, ...inst },
+      payload: { startEpoch: epoch, roundNumber: roundNumberRef.current, from: myIdRef.current, ...inst },
     });
-  }, [applyInstrument, pushPresence]);
+  }, [applyInstrument, pushPresence, voteTally]);
 
   const rematch = useCallback(() => {
+    if (!isHostRef.current) return;
     const rn = roundNumberRef.current + 1;
     enterRound(rn);
-    pushPresence({ startEpoch: null, roundNumber: rn });
+    pushPresence();
     channelRef.current?.send({
       type: "broadcast",
       event: "control",
-      payload: { rematch: true, roundNumber: rn, startEpoch: null },
+      payload: { rematch: true, roundNumber: rn, startEpoch: null, from: myIdRef.current },
     });
   }, [enterRound, pushPresence]);
 
