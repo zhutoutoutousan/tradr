@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { createPortal } from "react-dom";
 
 interface RoomQRShareProps {
   room: string;
@@ -107,14 +108,14 @@ export default function RoomQRShare({ room, baseUrl }: RoomQRShareProps) {
       </button>
 
       {/* QR Modal */}
-      {showQR && (
+      {showQR && createPortal(
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4"
           onClick={() => setShowQR(false)}
+          data-testid="room-qr-modal"
         >
           <div
-            className="relative w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
-            style={{ transform: 'translateY(50%)' }}
+            className="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close Button */}
@@ -256,7 +257,8 @@ export default function RoomQRShare({ room, baseUrl }: RoomQRShareProps) {
               </ul>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

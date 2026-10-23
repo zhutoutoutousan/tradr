@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { QRCodeSVG } from "qrcode.react";
 import {
   buildRaceShareText,
@@ -192,14 +193,16 @@ function QRShareModal({
     flash("Opening Telegram...");
   }
 
-  return (
+  // Portaled to <body>: ancestors with backdrop-filter/transform (e.g. the
+  // results dialog) would otherwise become the containing block and clip it.
+  return createPortal(
     <div
-      className="fixed inset-0 z-[10000] bg-slate-950/95 backdrop-blur-sm"
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/95 p-4 backdrop-blur-sm"
       onClick={onClose}
+      data-testid="share-qr-modal"
     >
-      <div 
-        className="fixed top-1/2 left-1/2 w-[calc(100%-2rem)] max-w-md max-h-[90vh] overflow-y-auto bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl"
-        style={{ transform: 'translate(-50%, -50%) !important' }}
+      <div
+        className="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button */}
@@ -321,6 +324,7 @@ function QRShareModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
