@@ -27,7 +27,10 @@ export default function GameOverModal({
   onReview: () => void;
   onContinue?: () => void;
 }) {
-  const { standings, rank, summary, eloBefore, eloAfter, eloDelta, newAchievements } = result;
+  const { standings, rank, summary, newAchievements } = result;
+  const eloBefore = accountResult?.eloBefore ?? result.eloBefore;
+  const eloAfter = accountResult?.eloAfter ?? result.eloAfter;
+  const eloDelta = accountResult?.eloChange ?? result.eloDelta;
   const won = rank === 1;
   const winRate = summary.trades > 0 ? (summary.wins / summary.trades) * 100 : 0;
   const eloUp = eloDelta >= 0;
@@ -57,7 +60,7 @@ export default function GameOverModal({
           </span>
         </div>
 
-        <RoundAccountInfo replayId={replayId} accountResult={accountResult} />
+        <RoundAccountInfo replayId={replayId} accountResult={accountResult} showElo={false} />
 
         {/* Round stats */}
         <div className="mt-4 grid grid-cols-4 gap-2 text-center">
