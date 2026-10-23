@@ -4,12 +4,27 @@ import { useState } from "react";
 import MultiplayerGame from "@/components/MultiplayerGame";
 import type { MpRole } from "@/hooks/useMultiplayer";
 import { useMultiplayerRooms } from "@/hooks/useMultiplayerRooms";
+import QrScanModal from "@/components/QrScanModal";
 
 function randomRoom() {
   const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
   let s = "";
   for (let i = 0; i < 5; i++) s += chars[Math.floor(Math.random() * chars.length)];
   return s;
+}
+
+/** Accepts a room invite link (…/multiplayer?room=ABCDE[&spectate=1]) or a bare room code. */
+export function parseRoomQr(text: string): { room: string; spectate: boolean } | null {
+  const trimmed = text.trim();
+  try {
+    const url = new URL(trimmed);
+    const room = url.searchParams.get("room")?.trim().toUpperCase();
+    if (room && /^[A-Z0-9]{3,8}$/.test(room)) return { room, spectate: url.searchParams.get("spectate") === "1" };
+    return null;
+  } catch {
+    const room = trimmed.toUpperCase();
+    return /^[A-Z0-9]{3,8}$/.test(room) ? { room, spectate: false } : null;
+  }
 }
 
 export default function MultiplayerJoin({
@@ -25,15 +40,25 @@ export default function MultiplayerJoin({
   const [name, setName] = useState("");
   const [room, setRoom] = useState(initialRoom.toUpperCase());
   const [role, setRole] = useState<MpRole>(initialSpectate ? "spectator" : "player");
+  const [scanning, setScanning] = useState(false);
   const { rooms, loading: roomsLoading, enabled: roomsEnabled } = useMultiplayerRooms();
 
-  function join(e?: React.FormEvent) {
+  function join(e?: React.FormEvent, override?: { room: string; role: MpRole }) {
     e?.preventDefault();
-    const n = name.trim() || (role === "spectator" ? "Observer" : "Trader");
-    const r = (room.trim() || randomRoom()).toUpperCase();
+    const joinRole = override?.role ?? role;
+    const n = name.trim() || (joinRole === "spectator" ? "Observer" : "Trader");
+    const r = (override?.room ?? (room.trim() || randomRoom())).toUpperCase();
     setName(n);
     setRoom(r);
+    setRole(joinRole);
     setJoined(true);
+  }
+
+  function handleScan(text: string) {
+    const parsed = parseRoomQr(text);
+    if (!parsed) return "That QR code is not a Tradr room. Scan the QR shown in the host's room.";
+    setScanning(false);
+    join(undefined, { room: parsed.room, role: parsed.spectate ? "spectator" : role });
   }
 
   if (joined) {
@@ -59,10 +84,31 @@ export default function MultiplayerJoin({
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Multiplayer</h1>
           <span className="rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-1 text-xs font-mono font-semibold text-emerald-400">
-            v3.8.2-sentry
+            v3.9.0-room-qr-scan
           </span>
         </div>
         <p className="mt-1 text-sm text-slate-400">3-minute race on the same live market. Play or watch as observer.</p>
+
+        <button
+          type="button"
+          onClick={() => setScanning(true)}
+          data-testid="scan-room-qr"
+          className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg border border-sky-500/50 bg-sky-500/10 py-3 text-base font-semibold text-sky-200 hover:bg-sky-500/20"
+        >
+          <span aria-hidden>📷</span> Scan room QR to join
+        </button>
+        <p className="mt-2 text-center text-xs text-slate-500">
+          Point your camera at the QR in someone&apos;s room. Your name and role below are used.
+        </p>
+
+        {scanning && (
+          <QrScanModal
+            title="Scan room QR"
+            hint="Hold the room QR inside the frame"
+            onResult={handleScan}
+            onClose={() => setScanning(false)}
+          />
+        )}
 
         <form onSubmit={join} className="mt-6 space-y-4">
           <div>

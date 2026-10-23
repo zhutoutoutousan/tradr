@@ -12,7 +12,7 @@ const BLUR = process.env.BLUR || '1.2';
 function makeCameraVideo(png, out) {
   // Grey background, QR scaled down, blurred and noisy, like a phone filming another screen.
   execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'color=c=0x606060:s=1280x720:d=2:r=10', '-i', png,
-    '-filter_complex', `[1:v]scale=-1:${QR_HEIGHT}[q];[0:v][q]overlay=(W-w)/2:(H-h)/2,gblur=sigma=${BLUR},noise=alls=12:allf=t,format=yuv420p`,
+    '-filter_complex', `[1:v]scale=-1:${QR_HEIGHT}[q];[0:v][q]overlay=(W-w)/2:(H-h)/2,gblur=sigma=${BLUR},noise=alls=12,format=yuv420p`,
     '-frames:v', '20', out]);
 }
 
@@ -28,7 +28,7 @@ async function launch(video) {
 }
 
 async function enterLocalMp(page, role, name) {
-  await page.goto(`${BASE}/`);
+  await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
   await page.click('[data-testid="mode-local-multiplayer"]');
   await page.click(role === 'host' ? 'button:has-text("Spiel erstellen")' : 'button:has-text("Spiel beitreten")');
   const input = page.locator('input[placeholder="Dein Spielername..."]');

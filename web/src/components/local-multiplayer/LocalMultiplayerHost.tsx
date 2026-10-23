@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import type { Html5Qrcode } from 'html5-qrcode';
-import { createQrScanner, QR_SCAN_CONFIG } from '@/lib/p2p/qr-scanner';
+import QrCameraView from '@/components/QrCameraView';
 import { webrtcManager } from '@/lib/p2p/webrtc-manager';
 import type { ConnectionState } from '@/lib/p2p/webrtc-manager';
 
@@ -21,11 +20,8 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
   const [answerSubmitted, setAnswerSubmitted] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [error, setError] = useState('');
-  const [scanningAnswer, setScanningAnswer] = useState(false);
   const [manualMode, setManualMode] = useState(false);
   const [shouldStartAnswerScanner, setShouldStartAnswerScanner] = useState(false);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const answerQrReaderRef = useRef<HTMLDivElement>(null);
   const scanHandledRef = useRef(false);
 
   useEffect(() => {
@@ -57,127 +53,41 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
 
     return () => {
       unsubscribe();
-      stopScanningAnswer();
     };
   }, [username, onConnected]);
 
-  // Initialize answer scanner after DOM is ready
-  useEffect(() => {
-    if (!shouldStartAnswerScanner || scanningAnswer || scannerRef.current) return;
+  const handleCameraError = (err: unknown) => {
+    console.error('[LocalMP Host] Camera failed:', err);
+    const { name, message } = (err ?? {}) as { name?: string; message?: string };
+    setShouldStartAnswerScanner(false);
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+      setError('❌ Kamera-Zugriff verweigert. Tippe auf "Erlauben" wenn Safari fragt.');
+    } else if (name === 'NotFoundError') {
+      setError('❌ Keine Kamera gefunden. Nutze "⌨️ Manuell" Modus.');
+    } else if (name === 'NotReadableError') {
+      setError('❌ Kamera blockiert. Schließe andere Kamera-Apps.');
+    } else {
+      setError(`❌ Kamera-Fehler: ${message || name || 'Unbekannter Fehler'}. Nutze manuelle Eingabe.`);
+    }
+  };
 
-    const initAnswerScanner = async () => {
-      setError('');
-      
-      try {
-        console.log('[LocalMP Host] Starting Answer QR scanner...');
-        
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error('Camera API not supported on this browser');
-        }
-        
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { 
-              facingMode: 'environment',
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            } 
-          });
-          console.log('[LocalMP Host] Camera permission granted');
-          stream.getTracks().forEach(track => track.stop());
-        } catch (permErr: any) {
-          console.error('[LocalMP Host] Camera permission error:', permErr);
-          setShouldStartAnswerScanner(false);
-          
-          if (permErr.name === 'NotAllowedError') {
-            setError('❌ Kamera-Zugriff verweigert. Tippe auf "Erlauben" wenn Safari fragt.');
-            return;
-          } else if (permErr.name === 'NotFoundError') {
-            setError('❌ Keine Kamera gefunden. Nutze "⌨️ Manuell" Modus.');
-            return;
-          } else if (permErr.name === 'NotReadableError') {
-            setError('❌ Kamera blockiert. Schließe andere Kamera-Apps.');
-            return;
-          } else {
-            setError(`❌ Kamera-Fehler: ${permErr.message || permErr.name}. Nutze manuelle Eingabe.`);
-            return;
-          }
-        }
-
-        // Wait for DOM with retries
-        let element = document.getElementById('answer-qr-reader');
-        let retries = 0;
-        while (!element && retries < 20) {
-          await new Promise(resolve => setTimeout(resolve, 50));
-          element = document.getElementById('answer-qr-reader');
-          retries++;
-          console.log(`[LocalMP Host] Waiting for answer-qr-reader element... retry ${retries}`);
-        }
-
-        if (!element) {
-          console.error('[LocalMP Host] answer-qr-reader element not found after retries');
-          setError('❌ Scanner konnte nicht initialisiert werden. Nutze "⌨️ Manuell" Modus.');
-          setShouldStartAnswerScanner(false);
-          return;
-        }
-
-        const scanner = createQrScanner('answer-qr-reader');
-        scannerRef.current = scanner;
-        scanHandledRef.current = false;
-
-        await scanner.start(
-          { facingMode: 'environment' },
-          QR_SCAN_CONFIG,
-          (decodedText) => {
-            // The scanner keeps firing every frame while the code is in view
-            if (scanHandledRef.current) return;
-            scanHandledRef.current = true;
-            console.log('[LocalMP Host] Answer QR scanned successfully');
-            setAnswerInput(decodedText);
-            stopScanningAnswer();
-            handleAnswerCode(decodedText);
-          },
-          (errorMessage) => {
-            // Ignore scanning errors
-          }
-        );
-
-        setScanningAnswer(true);
-        setError('');
-        console.log('[LocalMP Host] Answer scanner started successfully');
-        
-      } catch (err: any) {
-        console.error('[LocalMP Host] Answer scanner initialization failed:', err);
-        setShouldStartAnswerScanner(false);
-        
-        const errorName = err.name || 'Unknown';
-        const errorMsg = err.message || 'Unbekannter Fehler';
-        
-        if (errorName === 'NotAllowedError') {
-          setError('❌ Kamera-Zugriff blockiert. Safari-Einstellungen → Kamera → Erlauben.');
-        } else if (errorName === 'NotFoundError' || errorMsg.includes('camera')) {
-          setError('❌ Keine Kamera verfügbar. Nutze "⌨️ Manuell" Modus.');
-        } else if (errorName === 'NotReadableError' || errorMsg.includes('use')) {
-          setError('❌ Kamera bereits in Verwendung. Schließe andere Apps.');
-        } else {
-          setError(`❌ Scanner-Fehler: ${errorMsg}. Nutze manuelle Eingabe.`);
-        }
-      }
-    };
-
-    initAnswerScanner();
-  }, [shouldStartAnswerScanner]);
+  const handleAnswerScanned = (text: string) => {
+    // The camera keeps decoding every frame while the code is in view
+    if (scanHandledRef.current) return;
+    scanHandledRef.current = true;
+    console.log('[LocalMP Host] Answer QR scanned successfully');
+    setAnswerInput(text);
+    setShouldStartAnswerScanner(false);
+    handleAnswerCode(text);
+  };
 
   const startScanningAnswer = () => {
+    scanHandledRef.current = false;
+    setError('');
     setShouldStartAnswerScanner(true);
   };
 
   const stopScanningAnswer = () => {
-    if (scannerRef.current) {
-      scannerRef.current.stop().catch(console.error);
-      scannerRef.current = null;
-    }
-    setScanningAnswer(false);
     setShouldStartAnswerScanner(false);
   };
 
@@ -356,7 +266,7 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
           {!manualMode && shouldStartAnswerScanner && (
             <div className="space-y-4 mb-4">
               <div className="bg-slate-900 rounded-lg p-2">
-                <div id="answer-qr-reader" className="rounded-lg overflow-hidden" style={{ minHeight: '300px' }} />
+                <QrCameraView className="rounded-lg" onDecode={handleAnswerScanned} onError={handleCameraError} />
               </div>
               <button
                 onClick={stopScanningAnswer}

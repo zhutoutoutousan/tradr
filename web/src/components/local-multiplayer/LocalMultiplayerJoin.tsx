@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import type { Html5Qrcode } from 'html5-qrcode';
-import { createQrScanner, QR_SCAN_CONFIG } from '@/lib/p2p/qr-scanner';
+import QrCameraView from '@/components/QrCameraView';
 import { webrtcManager } from '@/lib/p2p/webrtc-manager';
 import type { ConnectionState } from '@/lib/p2p/webrtc-manager';
 
@@ -14,17 +13,14 @@ interface LocalMultiplayerJoinProps {
 }
 
 export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalMultiplayerJoinProps) {
-  const [scanning, setScanning] = useState(false);
   const [manualMode, setManualMode] = useState(false);
   const [offerInput, setOfferInput] = useState('');
   const [answerCode, setAnswerCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [error, setError] = useState('');
-  const scannerRef = useRef<Html5Qrcode | null>(null);
   const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
   const [shouldStartScanner, setShouldStartScanner] = useState(false);
-  const qrReaderRef = useRef<HTMLDivElement>(null);
   const scanHandledRef = useRef(false);
 
   useEffect(() => {
@@ -40,135 +36,42 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
 
     return () => {
       unsubscribe();
-      stopScanning();
     };
   }, [onConnected]);
 
-  // Initialize scanner after DOM is ready
-  useEffect(() => {
-    if (!shouldStartScanner || scanning || scannerRef.current) return;
+  const handleCameraError = (err: unknown) => {
+    console.error('[LocalMP Join] Camera failed:', err);
+    const { name, message } = (err ?? {}) as { name?: string; message?: string };
+    setShouldStartScanner(false);
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+      setCameraPermission(false);
+      setError('❌ Kamera-Zugriff verweigert. Tippe auf "Erlauben" wenn Safari nach Erlaubnis fragt.');
+    } else if (name === 'NotFoundError') {
+      setError('❌ Keine Kamera gefunden. Dein Gerät hat keine Kamera oder sie ist deaktiviert.');
+    } else if (name === 'NotReadableError') {
+      setError('❌ Kamera ist blockiert oder wird von einer anderen App verwendet. Schließe andere Kamera-Apps.');
+    } else {
+      setError(`❌ Kamera-Zugriff fehlgeschlagen: ${message || name || 'Unbekannter Fehler'}. Nutze "⌨️ Manuell" Modus.`);
+    }
+  };
 
-    const initScanner = async () => {
-      setError('');
-      
-      try {
-        console.log('[LocalMP Join] Requesting camera access...');
-        
-        // Check if mediaDevices is supported
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error('Camera API not supported on this browser');
-        }
-        
-        // iOS requires explicit camera permission request
-        let stream;
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { 
-              facingMode: 'environment',
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            } 
-          });
-          console.log('[LocalMP Join] Camera permission granted');
-          stream.getTracks().forEach(track => track.stop());
-        } catch (permErr: any) {
-          console.error('[LocalMP Join] Permission error:', permErr);
-          setCameraPermission(false);
-          setShouldStartScanner(false);
-          
-          if (permErr.name === 'NotAllowedError') {
-            setError('❌ Kamera-Zugriff verweigert. Tippe auf "Erlauben" wenn Safari nach Erlaubnis fragt.');
-            return;
-          } else if (permErr.name === 'NotFoundError') {
-            setError('❌ Keine Kamera gefunden. Dein Gerät hat keine Kamera oder sie ist deaktiviert.');
-            return;
-          } else if (permErr.name === 'NotReadableError') {
-            setError('❌ Kamera ist blockiert oder wird von einer anderen App verwendet. Schließe andere Kamera-Apps.');
-            return;
-          } else {
-            setError(`❌ Kamera-Zugriff fehlgeschlagen: ${permErr.message || permErr.name}. Nutze "⌨️ Manuell" Modus.`);
-            return;
-          }
-        }
-
-        // Wait for DOM using multiple strategies
-        let element = document.getElementById('qr-reader');
-        let retries = 0;
-        while (!element && retries < 20) {
-          await new Promise(resolve => setTimeout(resolve, 50));
-          element = document.getElementById('qr-reader');
-          retries++;
-          console.log(`[LocalMP Join] Waiting for qr-reader element... retry ${retries}`);
-        }
-
-        if (!element) {
-          console.error('[LocalMP Join] qr-reader element not found after retries');
-          setError('❌ Scanner konnte nicht initialisiert werden. Nutze "⌨️ Manuell" Modus.');
-          setShouldStartScanner(false);
-          return;
-        }
-
-        console.log('[LocalMP Join] Starting QR scanner...');
-        const scanner = createQrScanner('qr-reader');
-        scannerRef.current = scanner;
-        scanHandledRef.current = false;
-
-        await scanner.start(
-          { facingMode: 'environment' },
-          QR_SCAN_CONFIG,
-          (decodedText) => {
-            // The scanner keeps firing every frame while the code is in view
-            if (scanHandledRef.current) return;
-            scanHandledRef.current = true;
-            console.log('[LocalMP Join] QR code scanned successfully');
-            stopScanning();
-            handleOfferCode(decodedText);
-          },
-          (errorMessage) => {
-            // Ignore frequent scanning errors (not finding QR codes)
-          }
-        );
-
-        setScanning(true);
-        setCameraPermission(true);
-        setError('');
-        console.log('[LocalMP Join] Scanner started successfully');
-        
-      } catch (err: any) {
-        console.error('[LocalMP Join] Scanner initialization failed:', err);
-        setShouldStartScanner(false);
-        
-        const errorName = err.name || 'Unknown';
-        const errorMsg = err.message || 'Unbekannter Fehler';
-        
-        if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError') {
-          setCameraPermission(false);
-          setError('❌ Kamera-Zugriff wurde blockiert. Bitte in Safari-Einstellungen → Kamera → Erlauben.');
-        } else if (errorName === 'NotFoundError' || errorMsg.includes('camera')) {
-          setError('❌ Keine Kamera verfügbar. Nutze bitte "⌨️ Manuell" Modus.');
-        } else if (errorName === 'NotReadableError' || errorMsg.includes('use')) {
-          setError('❌ Kamera wird bereits verwendet. Schließe andere Apps (Instagram, Snapchat, etc.).');
-        } else if (errorMsg.includes('HTTPS') || errorMsg.includes('secure')) {
-          setError('❌ Kamera benötigt HTTPS. Lade die Seite über https:// neu.');
-        } else {
-          setError(`❌ Scanner-Fehler (${errorName}): ${errorMsg}. Bitte nutze "⌨️ Manuell" Modus.`);
-        }
-      }
-    };
-
-    initScanner();
-  }, [shouldStartScanner]);
+  const handleScanned = (text: string) => {
+    // The camera keeps decoding every frame while the code is in view
+    if (scanHandledRef.current) return;
+    scanHandledRef.current = true;
+    console.log('[LocalMP Join] QR code scanned successfully');
+    setShouldStartScanner(false);
+    handleOfferCode(text);
+  };
 
   const startScanning = () => {
+    scanHandledRef.current = false;
+    setError('');
+    setCameraPermission(true);
     setShouldStartScanner(true);
   };
 
   const stopScanning = () => {
-    if (scannerRef.current) {
-      scannerRef.current.stop().catch(console.error);
-      scannerRef.current = null;
-    }
-    setScanning(false);
     setShouldStartScanner(false);
   };
 
@@ -399,7 +302,7 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
           ) : (
             <div className="space-y-4">
               <div className="bg-slate-900 rounded-lg p-2">
-                <div id="qr-reader" className="rounded-lg overflow-hidden" style={{ minHeight: '300px' }} />
+                <QrCameraView className="rounded-lg" onDecode={handleScanned} onError={handleCameraError} />
               </div>
               <button
                 onClick={stopScanning}
