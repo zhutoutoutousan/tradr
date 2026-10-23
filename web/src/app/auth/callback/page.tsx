@@ -48,27 +48,30 @@ function AuthCallbackContent() {
           return;
         }
 
-        // Exchange code for session
-        console.log('[Auth Callback] Exchanging code for session...');
-        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        // The browser client (detectSessionInUrl) exchanges ?code= itself during
+        // initialization and then deletes the PKCE verifier, so a second
+        // exchangeCodeForSession() would always fail. getSession() waits for that
+        // initialization to finish.
+        console.log('[Auth Callback] Waiting for session from URL...');
+        let { data: { session } } = await supabase.auth.getSession();
 
-        if (exchangeError) {
-          console.error('[Auth Callback] Exchange error:', exchangeError);
-          setError(exchangeError.message);
-          setTimeout(() => {
-            window.location.href = '/register';
-          }, 2000);
-          return;
+        if (!session) {
+          const { data: exchanged, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          session = exchanged.session;
+          if (!session) {
+            ({ data: { session } } = await supabase.auth.getSession());
+          }
+          if (!session) {
+            console.error('[Auth Callback] Exchange error:', exchangeError);
+            setError(exchangeError?.message || 'No session created');
+            setTimeout(() => {
+              window.location.href = '/register';
+            }, 2000);
+            return;
+          }
         }
 
-        if (!data.session) {
-          console.error('[Auth Callback] No session returned, data:', data);
-          setError('No session created');
-          setTimeout(() => {
-            window.location.href = '/register';
-          }, 2000);
-          return;
-        }
+        const data = { session, user: session.user };
 
         console.log('[Auth Callback] Session created successfully for:', data.user?.email);
         console.log('[Auth Callback] Session details:', {

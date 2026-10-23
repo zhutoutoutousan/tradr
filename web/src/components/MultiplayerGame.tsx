@@ -36,7 +36,7 @@ const KIND_LABELS: Record<string, string> = {
 };
 
 // Bump on each deploy so a stale cached build is obvious on every device.
-const BUILD_TAG = "v3.7.1-ssr-cookies";
+const BUILD_TAG = "v3.7.2-oauth-session";
 
 export default function MultiplayerGame({
   room,
