@@ -222,6 +222,44 @@ class AuthService {
     return data;
   }
 
+  /** Returns the user's profile, creating it on first login (e.g. after OAuth). */
+  async ensureUserProfile(user: User): Promise<UserProfile | null> {
+    if (!supabase) return null;
+
+    const { data: existing } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (existing) return existing;
+
+    const meta = user.user_metadata ?? {};
+    // username column: unique, 3-20 chars
+    const base = String(meta.username || meta.user_name || meta.preferred_username || user.email?.split('@')[0] || 'player')
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '')
+      .slice(0, 14)
+      .padEnd(3, '0');
+    const displayName = String(meta.display_name || meta.full_name || meta.name || base).slice(0, 50);
+
+    for (const username of [base, `${base}_${user.id.slice(0, 5)}`]) {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .insert({ id: user.id, username, display_name: displayName, avatar_url: meta.avatar_url ?? null })
+        .select('*')
+        .single();
+      if (!error) return data;
+      if (error.code !== '23505') {
+        console.error('[Auth] Failed to create profile:', error);
+        return null;
+      }
+      // 23505 on the primary key means a concurrent call already created it
+      const { data: raced } = await supabase.from('user_profiles').select('*').eq('id', user.id).maybeSingle();
+      if (raced) return raced;
+    }
+    return null;
+  }
+
   async updateUserProfile(userId: string, updates: Partial<UserProfile>): Promise<void> {
     if (!supabase) return;
 

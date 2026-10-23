@@ -18,7 +18,7 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
       const { session } = await authService.getSession();
       if (session?.user) {
         setUser(session.user);
-        const userProfile = await authService.getUserProfile(session.user.id);
+        const userProfile = await authService.ensureUserProfile(session.user);
         setProfile(userProfile);
       }
     };
@@ -27,7 +27,7 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
     const unsubscribe = authService.onAuthStateChange((authUser) => {
       setUser(authUser);
       if (authUser) {
-        authService.getUserProfile(authUser.id).then(setProfile);
+        authService.ensureUserProfile(authUser).then(setProfile);
       } else {
         setProfile(null);
       }
@@ -180,7 +180,7 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
         <p className="text-xs text-slate-600">
           ◆ Tradr — tap a mode to start
           <span className="ml-2 rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-500/80">
-            v3.7.2-oauth-session
+            v3.7.3-oauth-profile
           </span>
         </p>
       </div>

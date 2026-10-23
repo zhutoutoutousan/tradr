@@ -39,7 +39,7 @@ export default function ProfilePage() {
       setUser(session.user);
 
       // Load profile
-      const userProfile = await authService.getUserProfile(session.user.id);
+      const userProfile = await authService.ensureUserProfile(session.user);
       if (userProfile) {
         setProfile(userProfile);
       }

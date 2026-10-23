@@ -31,7 +31,7 @@ export default function LandingIntro({
       const { session } = await authService.getSession();
       if (session?.user) {
         setUser(session.user);
-        const userProfile = await authService.getUserProfile(session.user.id);
+        const userProfile = await authService.ensureUserProfile(session.user);
         setProfile(userProfile);
       }
     };
@@ -40,7 +40,7 @@ export default function LandingIntro({
     const unsubscribe = authService.onAuthStateChange((authUser) => {
       setUser(authUser);
       if (authUser) {
-        authService.getUserProfile(authUser.id).then(setProfile);
+        authService.ensureUserProfile(authUser).then(setProfile);
       } else {
         setProfile(null);
       }
@@ -56,7 +56,7 @@ export default function LandingIntro({
           <div className="flex items-center gap-2">
             <span className="text-lg font-bold tracking-tight text-emerald-400">◆ Tradr</span>
             <span className="rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-xs font-mono font-semibold text-emerald-400">
-              v3.7.2-oauth-session
+              v3.7.3-oauth-profile
             </span>
           </div>
           <div className="flex flex-wrap gap-2">

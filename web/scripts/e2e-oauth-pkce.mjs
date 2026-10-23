@@ -12,7 +12,7 @@ const fakeUser = {
   role: 'authenticated',
   email: 'e2e@tradr.test',
   app_metadata: { provider: 'github' },
-  user_metadata: { user_name: 'e2e_user', full_name: 'E2E User' },
+  user_metadata: { user_name: 'E2E-Very-Long-GitHub-Username', full_name: 'E2E User' },
   created_at: new Date().toISOString(),
 };
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -42,14 +42,25 @@ if (MODE === 'mock') {
     });
   });
   await context.route(`${SUPA}/auth/v1/user**`, (r) => r.fulfill({ status: 200, json: fakeUser }));
-  await context.route(`${SUPA}/rest/v1/**`, (r) =>
-    r.fulfill({
-      status: 200,
-      json: r.request().method() === 'GET'
-        ? { id: fakeUser.id, username: 'e2e_user', display_name: 'E2E User', elo_rating: 1200, best_elo: 1200, total_games: 0, total_wins: 0, total_profit: 0 }
-        : [],
-    }),
-  );
+  // Starts with no profile row, like a first OAuth login; the app must insert one.
+  let profileRow = null;
+  await context.route(`${SUPA}/rest/v1/user_profiles**`, async (r) => {
+    const req = r.request();
+    const wantsObject = (req.headers()['accept'] || '').includes('pgrst.object');
+    if (req.method() === 'POST') {
+      const body = req.postDataJSON();
+      profileRow = { elo_rating: 1200, best_elo: 1200, total_games: 0, total_wins: 0, total_profit: 0, ...(Array.isArray(body) ? body[0] : body) };
+      console.log(`[mock] profile inserted: username=${profileRow.username}`);
+      return r.fulfill({ status: 201, json: wantsObject ? profileRow : [profileRow] });
+    }
+    if (wantsObject) {
+      return profileRow
+        ? r.fulfill({ status: 200, json: profileRow })
+        : r.fulfill({ status: 406, json: { code: 'PGRST116', message: 'no rows' } });
+    }
+    return r.fulfill({ status: 200, json: profileRow ? [profileRow] : [] });
+  });
+  await context.route(`${SUPA}/rest/v1/games**`, (r) => r.fulfill({ status: 200, json: [] }));
 }
 
 await page.goto(`${BASE}/register`, { waitUntil: 'networkidle' });
@@ -73,7 +84,10 @@ console.log(`session cookie present: ${session}`);
 console.log(`token exchange calls: ${tokenCalls}`);
 console.log(`page shows PKCE error: ${body.includes('code verifier not found')}`);
 if (MODE === 'mock') {
-  console.log(`logged-in UI on /play: ${/e2e_user|E2E User|Profile|Logout|Abmelden/i.test(body)}`);
+  console.log(`logged-in UI after callback: ${body.includes('E2E User')}`);
+  await page.goto(`${BASE}/`);
+  await page.waitForTimeout(4000);
+  console.log(`still logged in after reload: ${((await page.textContent('body')) || '').includes('E2E User')}`);
   await page.screenshot({ path: '/tmp/e2e-oauth-final.png', fullPage: true });
 }
 await browser.close();

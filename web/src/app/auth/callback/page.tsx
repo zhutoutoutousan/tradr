@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { authService } from '@/lib/auth/supabase-auth';
 
 function AuthCallbackContent() {
   const router = useRouter();
@@ -80,43 +81,8 @@ function AuthCallbackContent() {
           provider: data.user?.app_metadata?.provider
         });
 
-        // Try to create user profile if it doesn't exist
-        if (data.user) {
-          try {
-            const username = data.user.user_metadata?.user_name ||
-                            data.user.user_metadata?.preferred_username ||
-                            data.user.email?.split('@')[0] ||
-                            `user_${data.user.id.slice(0, 8)}`;
-
-            const displayName = data.user.user_metadata?.full_name ||
-                               data.user.user_metadata?.name ||
-                               data.user.email?.split('@')[0];
-
-            console.log('[Auth Callback] Creating/updating profile for:', username);
-            
-            const { error: profileError } = await supabase.from('user_profiles').upsert({
-              id: data.user.id,
-              username,
-              display_name: displayName,
-              elo_rating: 1200,
-              best_elo: 1200,
-              preferred_language: 'de',
-            }, {
-              onConflict: 'id',
-              ignoreDuplicates: false,
-            });
-
-            if (profileError) {
-              console.error('[Auth Callback] Profile creation error:', profileError);
-              // Don't fail the login, profile can be created later
-            } else {
-              console.log('[Auth Callback] Profile created/updated successfully');
-            }
-          } catch (profileErr) {
-            console.error('[Auth Callback] Profile creation exception:', profileErr);
-            // Don't fail the login
-          }
-        }
+        const profile = await authService.ensureUserProfile(data.user);
+        console.log('[Auth Callback] Profile ready:', profile?.username ?? 'unavailable');
 
         // Wait a moment for state to propagate
         console.log('[Auth Callback] Waiting 500ms before redirect...');

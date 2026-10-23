@@ -15,7 +15,7 @@ export function useAuth() {
       setUser(currentUser);
 
       if (currentUser) {
-        const userProfile = await authService.getUserProfile(currentUser.id);
+        const userProfile = await authService.ensureUserProfile(currentUser);
         setProfile(userProfile);
       }
 
@@ -28,7 +28,7 @@ export function useAuth() {
       setUser(newUser);
 
       if (newUser) {
-        const userProfile = await authService.getUserProfile(newUser.id);
+        const userProfile = await authService.ensureUserProfile(newUser);
         setProfile(userProfile);
       } else {
         setProfile(null);
