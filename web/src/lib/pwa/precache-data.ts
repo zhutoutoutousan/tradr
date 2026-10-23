@@ -8,6 +8,8 @@ const MARKET_SYMBOLS = [
   'bac', 'dis', 'nflx', 'ba', 'pfe', 'intc', 'csco', 'orcl', 'unh', 'mcd'
 ];
 
+const FRESH_MS = 24 * 60 * 60 * 1000;
+
 export async function precacheMarketData(signal?: AbortSignal): Promise<void> {
   console.log('[Precache] Starting market data caching...');
   
@@ -21,7 +23,12 @@ export async function precacheMarketData(signal?: AbortSignal): Promise<void> {
     }
 
     try {
-      const response = await fetch(`/data/${symbol}.json`);
+      const existing = await offlineStorage.getCachedData(`market-${symbol}`).catch(() => null);
+      if (existing && Date.now() - existing.timestamp < FRESH_MS) {
+        cached++;
+        continue;
+      }
+      const response = await fetch(`/data/${symbol}.json`, { signal });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
@@ -36,7 +43,12 @@ export async function precacheMarketData(signal?: AbortSignal): Promise<void> {
       console.log(`[Precache] Cached ${symbol} (${cached}/${MARKET_SYMBOLS.length})`);
     } catch (error) {
       failed++;
-      console.error(`[Precache] Failed to cache ${symbol}:`, error);
+      // Offline or the page is going away: the remaining fetches would fail the same way.
+      if (signal?.aborted || error instanceof TypeError) {
+        console.warn(`[Precache] Stopped at ${symbol}:`, error);
+        break;
+      }
+      console.warn(`[Precache] Failed to cache ${symbol}:`, error);
     }
   }
 
@@ -65,6 +77,8 @@ export async function getCachedMarketData(symbol: string): Promise<any | null> {
 export async function isPrecached(): Promise<boolean> {
   try {
     const firstSymbol = MARKET_SYMBOLS[0];
+
+const FRESH_MS = 24 * 60 * 60 * 1000;
     const cached = await offlineStorage.getCachedData(`market-${firstSymbol}`);
     return !!cached;
   } catch {
@@ -74,14 +88,16 @@ export async function isPrecached(): Promise<boolean> {
 
 export function startBackgroundPrecache(): void {
   if (typeof window === 'undefined') return;
+  const controller = new AbortController();
+  window.addEventListener('pagehide', () => controller.abort(), { once: true });
+  const run = () => {
+    if (!navigator.onLine) return;
+    precacheMarketData(controller.signal).catch((err) => console.warn('[Precache]', err));
+  };
 
   if ('requestIdleCallback' in window) {
-    requestIdleCallback(() => {
-      precacheMarketData().catch(console.error);
-    }, { timeout: 10000 });
+    requestIdleCallback(run, { timeout: 10000 });
   } else {
-    setTimeout(() => {
-      precacheMarketData().catch(console.error);
-    }, 2000);
+    setTimeout(run, 2000);
   }
 }
