@@ -11,7 +11,7 @@ import { useSwipeDismiss } from '@/hooks/useSwipeDismiss';
 export function PWAProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const isOnline = useOnlineStatus();
-  const { isUpdateAvailable, skipWaiting } = useServiceWorkerUpdate();
+  const { isUpdateAvailable, applyUpdate } = useServiceWorkerUpdate();
   const { canInstall, isStandalone, promptInstall } = usePWAInstall();
   
   // Swipe dismiss hooks for each banner
@@ -128,10 +128,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
               <div className="text-sm opacity-90">Neue Version der App ist bereit</div>
             </div>
             <button
-              onClick={() => {
-                skipWaiting();
-                setStableUpdateAvailable(false);
-              }}
+              onClick={applyUpdate}
               className="px-3 py-1.5 bg-white text-blue-600 rounded font-semibold text-sm hover:bg-blue-50 transition-colors"
             >
               Aktualisieren

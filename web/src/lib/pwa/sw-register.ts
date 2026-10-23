@@ -32,30 +32,34 @@ class ServiceWorkerManager {
     }
 
     try {
-      // STEP 1: Unregister ALL old service workers first (clean slate)
-      const existingRegistrations = await navigator.serviceWorker.getRegistrations();
-      if (existingRegistrations.length > 0) {
-        console.log(`[PWA] Found ${existingRegistrations.length} existing Service Worker(s), unregistering...`);
-        for (const reg of existingRegistrations) {
-          await reg.unregister();
-          console.log('[PWA] Unregistered old Service Worker:', reg.scope);
-        }
-      }
-
-      // STEP 2: Check if SW file exists before registering
+      // Never unregister existing workers here: a fresh registration installs a
+      // new worker that claims the page on every load, and reloading on that
+      // claim made iOS reload in an endless loop.
       try {
         const swCheck = await fetch('/sw.js', { method: 'HEAD', cache: 'no-cache' });
         if (!swCheck.ok) {
           console.error('[PWA] Service Worker file not found at /sw.js (status:', swCheck.status, ')');
           return null;
         }
-        console.log('[PWA] Service Worker file exists, proceeding with registration');
       } catch (fetchError) {
         console.error('[PWA] Cannot check Service Worker file:', fetchError);
         return null;
       }
 
-      // STEP 3: Register new Service Worker
+      let controlled = !!navigator.serviceWorker.controller;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        // The first install taking control of the page is not an update.
+        if (!controlled) {
+          controlled = true;
+          return;
+        }
+        // sw.js activates new versions itself (skipWaiting + clients.claim).
+        // Reloading is left to the user so a running game is never interrupted.
+        console.log('[PWA] New version active, update available');
+        this.state.isUpdateAvailable = true;
+        this.notifyListeners();
+      });
+
       const registration = await navigator.serviceWorker.register('/sw.js', {
         scope: '/',
         updateViaCache: 'none',
@@ -65,29 +69,9 @@ class ServiceWorkerManager {
       this.state.isRegistered = true;
       this.notifyListeners();
 
-      console.log('[PWA] Service Worker registered successfully:', registration);
+      console.log('[PWA] Service Worker registered successfully:', registration.scope);
 
-      registration.addEventListener('updatefound', () => {
-        const newWorker = registration.installing;
-        if (!newWorker) return;
-
-        console.log('[PWA] New Service Worker found');
-
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            console.log('[PWA] New Service Worker installed, update available');
-            this.state.isUpdateAvailable = true;
-            this.notifyListeners();
-          }
-        });
-      });
-
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        console.log('[PWA] Controller changed, reloading page');
-        window.location.reload();
-      });
-
-      // STEP 4: Check for updates (but don't fail if this errors)
+      // Check for updates (non-critical)
       try {
         await registration.update();
       } catch (updateError) {
@@ -131,12 +115,9 @@ class ServiceWorkerManager {
     }
   }
 
-  skipWaiting(): void {
-    if (!this.state.registration?.waiting) {
-      return;
-    }
-
-    this.state.registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+  applyUpdate(): void {
+    this.state.registration?.waiting?.postMessage({ type: 'SKIP_WAITING' });
+    window.location.reload();
   }
 
   async checkForUpdates(): Promise<void> {
@@ -194,10 +175,10 @@ export function registerServiceWorker(): Promise<ServiceWorkerRegistration | nul
 
 export function useServiceWorkerUpdate(): {
   isUpdateAvailable: boolean;
-  skipWaiting: () => void;
+  applyUpdate: () => void;
 } {
   if (typeof window === 'undefined') {
-    return { isUpdateAvailable: false, skipWaiting: () => {} };
+    return { isUpdateAvailable: false, applyUpdate: () => {} };
   }
 
   const [state, setState] = React.useState(swManager.getState());
@@ -209,6 +190,6 @@ export function useServiceWorkerUpdate(): {
 
   return {
     isUpdateAvailable: state.isUpdateAvailable,
-    skipWaiting: () => swManager.skipWaiting(),
+    applyUpdate: () => swManager.applyUpdate(),
   };
 }

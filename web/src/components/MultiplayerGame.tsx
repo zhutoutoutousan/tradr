@@ -36,7 +36,7 @@ const KIND_LABELS: Record<string, string> = {
 };
 
 // Bump on each deploy so a stale cached build is obvious on every device.
-const BUILD_TAG = "v3.8.0-qr-compact";
+const BUILD_TAG = "v3.8.1-sw-loop-fix";
 
 export default function MultiplayerGame({
   room,
