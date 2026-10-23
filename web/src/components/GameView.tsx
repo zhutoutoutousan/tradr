@@ -58,7 +58,7 @@ export default function GameView({
   onContinue?: () => void;
   onOpenTutorial?: () => void;
 }) {
-  const { snapshot, running, speed, speedIdx, speeds, timeLeftMs, gameOver, result, powerups, controls } =
+  const { snapshot, running, speed, speedIdx, speeds, timeLeftMs, gameOver, result, replayId, accountResult, powerups, controls } =
     useGame(config, markets);
   const isMobile = useIsMobile();
   const chartHeight = 440;
@@ -413,6 +413,8 @@ export default function GameView({
       {gameOver && result && !reviewOpen && !menuOpen && (
         <GameOverModal
           result={result}
+          replayId={replayId}
+          accountResult={accountResult}
           onReplay={onReplay}
           onMenu={() => setMenuOpen(true)}
           onReview={() => setReviewOpen(result.review)}

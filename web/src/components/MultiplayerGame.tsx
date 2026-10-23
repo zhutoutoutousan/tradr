@@ -7,6 +7,7 @@ import DanmakuOverlay from "@/components/DanmakuOverlay";
 import RoomChat from "@/components/RoomChat";
 import RoomQRShare from "@/components/RoomQRShare";
 import ShareButtons from "@/components/ShareButtons";
+import RoundAccountInfo from "@/components/RoundAccountInfo";
 import { useMultiplayer, type MpRole } from "@/hooks/useMultiplayer";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
@@ -71,6 +72,8 @@ export default function MultiplayerGame({
     danmaku,
     sendChat,
     saveStatus,
+    replayId,
+    accountResult,
   } = useMultiplayer(room, name, role);
 
   const running = phase === "running" && !isSpectator;
@@ -540,6 +543,8 @@ export default function MultiplayerGame({
                 {saveStatus === "error" && "Could not save run — check connection and try another round."}
               </p>
             )}
+
+            <RoundAccountInfo replayId={replayId} accountResult={accountResult} />
 
             <div className="mt-4">
               <ShareButtons room={room} rank={overallRank} returnPct={isSpectator ? undefined : me.returnPct} />

@@ -4,21 +4,25 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { authService, type UserProfile } from '@/lib/auth/supabase-auth';
 import { supabase } from '@/lib/supabase';
+import { calculateLevel, xpProgress } from '@/lib/game/progress';
+import { replayUrl } from '@/lib/replay/storage';
 
 interface GameRecord {
   id: string;
-  created_at: string;
+  played_at: string;
   mode: string;
-  market_symbol: string;
-  market_name: string;
-  initial_balance: number;
+  market_id: string;
+  market_label: string;
+  rank: number;
+  total_players: number | null;
   final_balance: number;
   profit: number;
   return_pct: number;
   trades: number;
   elo_before: number;
   elo_after: number;
-  duration_seconds: number;
+  xp_gained: number;
+  replay_id: string | null;
 }
 
 export default function ProfilePage() {
@@ -47,14 +51,14 @@ export default function ProfilePage() {
       // Load game history
       if (supabase) {
         const { data: gamesData } = await supabase
-          .from('games')
-          .select('*')
+          .from('user_game_history')
+          .select('id, played_at, mode, market_id, market_label, rank, total_players, final_balance, profit, return_pct, trades, elo_before, elo_after, xp_gained, replay_id')
           .eq('user_id', session.user.id)
-          .order('created_at', { ascending: false })
+          .order('played_at', { ascending: false })
           .limit(50);
 
         if (gamesData) {
-          setGames(gamesData);
+          setGames(gamesData as GameRecord[]);
         }
       }
 
@@ -85,6 +89,9 @@ export default function ProfilePage() {
     );
   }
 
+  const xp = profile.xp ?? 0;
+  const level = calculateLevel(xp);
+  const levelProgress = xpProgress(xp, level);
   const winRate = profile.total_games > 0 
     ? ((profile.total_wins / profile.total_games) * 100).toFixed(1) 
     : '0.0';
@@ -123,6 +130,18 @@ export default function ProfilePage() {
             >
               Spielen
             </Link>
+          </div>
+
+          <div className="mb-6" data-testid="profile-xp">
+            <div className="mb-1 flex items-baseline justify-between text-sm">
+              <span className="font-semibold text-amber-300">Level {level}</span>
+              <span className="font-mono text-xs text-slate-400">
+                {xp} XP · {Math.max(0, levelProgress.current)}/{levelProgress.required} bis Level {level + 1}
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+              <div className="h-full bg-amber-400" style={{ width: `${Math.max(0, levelProgress.percentage)}%` }} />
+            </div>
           </div>
 
           {/* Stats Grid */}
@@ -218,16 +237,16 @@ export default function ProfilePage() {
                   key={game.id}
                   className="bg-slate-800/50 rounded-lg p-4 border border-slate-700 hover:border-slate-600 transition-colors"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-4">
                       <div className="text-xs text-slate-500 w-24">
-                        {new Date(game.created_at).toLocaleDateString('de-DE', {
+                        {new Date(game.played_at).toLocaleDateString('de-DE', {
                           day: '2-digit',
                           month: '2-digit',
                           year: '2-digit',
                         })}
                         <br />
-                        {new Date(game.created_at).toLocaleTimeString('de-DE', {
+                        {new Date(game.played_at).toLocaleTimeString('de-DE', {
                           hour: '2-digit',
                           minute: '2-digit',
                         })}
@@ -238,7 +257,11 @@ export default function ProfilePage() {
                           {game.mode.toUpperCase()}
                         </span>
                         <span className="text-sm text-slate-300">
-                          {game.market_name || game.market_symbol}
+                          {game.market_label || game.market_id}
+                        </span>
+                        <span className="text-xs text-slate-400">
+                          #{game.rank}
+                          {game.total_players ? `/${game.total_players}` : ''}
                         </span>
                       </div>
 
@@ -246,6 +269,17 @@ export default function ProfilePage() {
                         <span className="text-slate-400">Trades:</span>
                         <span className="ml-1 text-slate-200">{game.trades}</span>
                       </div>
+                      {game.xp_gained > 0 && (
+                        <span className="text-xs font-semibold text-amber-300">+{game.xp_gained} XP</span>
+                      )}
+                      {game.replay_id && (
+                        <Link
+                          href={replayUrl(game.replay_id)}
+                          className="rounded border border-fuchsia-500/50 px-2 py-0.5 text-xs font-semibold text-fuchsia-300 hover:bg-fuchsia-500/10"
+                        >
+                          ▶ Replay
+                        </Link>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-6">

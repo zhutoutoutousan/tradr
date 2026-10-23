@@ -15,6 +15,7 @@ export interface UserProfile {
   total_profit: number;
   best_return_pct: number;
   best_single_profit: number;
+  xp?: number;
   created_at: string;
   last_played_at: string | null;
   preferred_language: 'de' | 'en';

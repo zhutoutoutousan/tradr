@@ -14,6 +14,10 @@ import {
   ROOM_HEARTBEAT_MS,
 } from "@/lib/multiplayer/roomDirectory";
 import { type MpRole } from "@/lib/multiplayer/lobby";
+import { ReplayRecorder } from "@/lib/replay/recorder";
+import { saveReplay } from "@/lib/replay/storage";
+import type { ReplayEvent } from "@/lib/replay/types";
+import { saveAccountGame, type AccountGameResult } from "@/lib/game/accountHistory";
 
 const MS_PER_TICK = 1000 / 9; // must match the synthetic feed's intended speed
 const COUNTDOWN_MS = 4000;
@@ -47,6 +51,16 @@ export interface ChatMessage {
   name: string;
   text: string;
   at: number;
+}
+
+interface TradeBroadcast {
+  id: string;
+  name: string;
+  ev: ReplayEvent;
+}
+
+export function multiplayerReplayId(room: string, roundNumber: number, startEpoch: number): string {
+  return `mp-${room}-r${roundNumber}-${startEpoch}`;
 }
 
 export interface InstrumentOption {
@@ -121,6 +135,7 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
   const roundCandlesRef = useRef<Candle[]>([]);
   const savedRoundRef = useRef(false);
   const roleRef = useRef<MpRole>(role);
+  const recorderRef = useRef<ReplayRecorder | null>(null);
 
   if (!engineRef.current) {
     engineRef.current = buildSyntheticEngine(room, 0);
@@ -159,6 +174,8 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
   const [traderCount, setTraderCount] = useState(1);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [roundNumber, setRoundNumber] = useState(0);
+  const [replayId, setReplayId] = useState<string | null>(null);
+  const [accountResult, setAccountResult] = useState<AccountGameResult | null>(null);
 
   // Load the catalogue of real markets once.
   useEffect(() => {
@@ -272,6 +289,8 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
     ch.on("broadcast", { event: "chat" }, ({ payload }) => {
       const msg = payload as ChatMessage;
       if (!msg?.id || !msg.text) return;
+      const rec = recorderRef.current;
+      if (rec) rec.addEvent({ t: rec.tick, k: "chat", id: msg.userId, name: msg.name, text: msg.text });
       setChatMessages((prev) => [...prev.slice(-99), msg]);
       setDanmaku((prev) => [
         ...prev,
@@ -282,6 +301,14 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
           color: REMOTE_PALETTE[colorForId(msg.userId)],
         },
       ]);
+    });
+
+    ch.on("broadcast", { event: "trade" }, ({ payload }) => {
+      const p = payload as TradeBroadcast;
+      const rec = recorderRef.current;
+      if (!rec || !p?.id || !p.ev || p.id === myIdRef.current) return;
+      rec.addParticipant({ id: p.id, name: p.name || "Trader", color: REMOTE_PALETTE[colorForId(p.id)], kind: "human" });
+      rec.addEvent({ ...p.ev, id: p.id });
     });
 
     ch.on("broadcast", { event: "control" }, ({ payload }) => {
@@ -298,6 +325,9 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
         setRoundNumber(rn);
         startEpochRef.current = null;
         savedRoundRef.current = false;
+        recorderRef.current = null;
+        setReplayId(null);
+        setAccountResult(null);
         setSaveStatus("idle");
         roundCandlesRef.current = [];
         if (instrumentRef.current === SYNTHETIC) {
@@ -412,6 +442,49 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
     };
   }, [publishActiveRoom, room, pushPresence]);
 
+  const publishTrades = useCallback(
+    (events: ReplayEvent[]) => {
+      const ch = channelRef.current;
+      if (!ch || roleRef.current !== "player") return;
+      for (const ev of events) {
+        if (ev.id !== myIdRef.current) continue;
+        ch.send({ type: "broadcast", event: "trade", payload: { id: myIdRef.current, name, ev } as TradeBroadcast });
+      }
+    },
+    [name],
+  );
+
+  const startRecorder = useCallback(
+    (e: GameEngine) => {
+      const rec = new ReplayRecorder(e, {
+        mode: "multiplayer",
+        room,
+        roundNumber: roundNumberRef.current,
+        marketId: instrumentRef.current,
+        marketLabel: e.market.label,
+        msPerTick: MS_PER_TICK,
+        me: roleRef.current === "player" ? { id: myIdRef.current, name, color: "#34d399" } : null,
+      });
+      const addHumans = () => {
+        for (const [id, m] of Object.entries(presenceRef.current)) {
+          if (id === myIdRef.current || m?.role === "spectator") continue;
+          rec.addParticipant({ id, name: m?.name ?? "Trader", color: REMOTE_PALETTE[colorForId(id)], kind: "human" });
+        }
+      };
+      addHumans();
+      rec.remoteEquity = () => {
+        addHumans();
+        const out: Record<string, number> = {};
+        for (const [id, st] of Object.entries(statsRef.current)) {
+          if (id !== myIdRef.current && presenceRef.current[id]) out[id] = st.eq;
+        }
+        return out;
+      };
+      return rec;
+    },
+    [name, room],
+  );
+
   // Game loop: deterministic, wall-clock synchronized across all clients.
   useEffect(() => {
     let raf = 0;
@@ -438,9 +511,12 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
             const target = Math.floor((now - start) / MS_PER_TICK);
             let steps = target - e.ticks;
             if (steps > MAX_CATCHUP) steps = MAX_CATCHUP;
+            if (!recorderRef.current && !savedRoundRef.current) recorderRef.current = startRecorder(e);
+            const rec = recorderRef.current;
             for (let i = 0; i < steps; i++) {
               const prevBar = e.market.bar;
               e.step();
+              if (rec) publishTrades(rec.afterStep(e));
               if (e.market.bar > prevBar) {
                 const closed = e.market.candles[e.market.candles.length - 1];
                 if (closed) {
@@ -546,7 +622,7 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [name, pushPresence]);
+  }, [name, pushPresence, publishTrades, startRecorder]);
 
   // Host-only: change the instrument while still in the lobby.
   const setInstrument = useCallback(
@@ -577,6 +653,9 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
     setRoundNumber(rn);
     startEpochRef.current = null;
     savedRoundRef.current = false;
+    recorderRef.current = null;
+    setReplayId(null);
+    setAccountResult(null);
     setSaveStatus("idle");
     roundCandlesRef.current = [];
     if (instrumentRef.current === SYNTHETIC) {
@@ -623,10 +702,25 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
   const finished = phase === "finished";
 
   useEffect(() => {
-    if (phase !== "finished" || roleRef.current === "spectator" || savedRoundRef.current) return;
+    if (phase !== "finished" || savedRoundRef.current) return;
     const e = engineRef.current;
     if (!e) return;
     savedRoundRef.current = true;
+
+    if (roleRef.current === "spectator") {
+      const rec = recorderRef.current;
+      const startEpoch = startEpochRef.current;
+      if (!rec || startEpoch == null) return;
+      const id = multiplayerReplayId(room, roundNumberRef.current, startEpoch);
+      const recording = rec.finish(e);
+      // Players upload the same round id first; this only fills in if none did.
+      window.setTimeout(() => {
+        saveReplay(id, recording)
+          .then(() => setReplayId(id))
+          .catch((err) => console.warn("replay save failed", err));
+      }, 3000);
+      return;
+    }
     setSaveStatus("saving");
 
     const price = e.market.currentPrice;
@@ -668,7 +762,49 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
       instrumentRef.current,
     );
     const setup = mpRoundSetup(instrumentRef.current);
-    saveMultiplayerRound(review, setup)
+
+    const rec = recorderRef.current;
+    const startEpoch = startEpochRef.current;
+    const id = rec && startEpoch != null ? multiplayerReplayId(room, roundNumberRef.current, startEpoch) : null;
+    const replaySaved: Promise<string | null> = id && rec
+      ? saveReplay(id, rec.finish(e))
+          .then(() => {
+            setReplayId(id);
+            return id;
+          })
+          .catch((err) => {
+            console.warn("replay save failed", err);
+            return null;
+          })
+      : Promise.resolve(null);
+
+    const others = [
+      ...e.bots.map((b) => ({ rating: b.rating, equity: equity(b, price) })),
+      ...Object.keys(presenceRef.current)
+        .filter((pid) => pid !== myIdRef.current && presenceRef.current[pid]?.role !== "spectator")
+        .map((pid) => ({ equity: statsRef.current[pid]?.eq ?? STARTING_BALANCE })),
+    ];
+    review.summary.totalPlayers = others.length + 1;
+    review.summary.rank = 1 + others.filter((o) => o.equity > eqMe).length;
+
+    const accountSaved = replaySaved
+      .then((rid) =>
+        saveAccountGame({
+          mode: "multiplayer",
+          review,
+          setup,
+          finalBalance: eqMe,
+          opponents: others,
+          myEquity: eqMe,
+          replayId: rid,
+        }),
+      )
+      .then((res) => {
+        if (res) setAccountResult(res);
+      })
+      .catch((err) => console.warn("account history save failed", err));
+
+    Promise.all([saveMultiplayerRound(review, setup), accountSaved])
       .then(() => setSaveStatus("saved"))
       .catch((err) => {
         console.warn("multiplayer save failed", err);
@@ -680,14 +816,20 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
     long: () => {
       if (finished || roleRef.current === "spectator") return;
       engineRef.current!.playerLong();
+      const rec = recorderRef.current;
+      if (rec) publishTrades(rec.syncPositions(engineRef.current!));
     },
     short: () => {
       if (finished || roleRef.current === "spectator") return;
       engineRef.current!.playerShort();
+      const rec = recorderRef.current;
+      if (rec) publishTrades(rec.syncPositions(engineRef.current!));
     },
     close: () => {
       if (finished || roleRef.current === "spectator") return;
       engineRef.current!.playerClose();
+      const rec = recorderRef.current;
+      if (rec) publishTrades(rec.syncPositions(engineRef.current!));
     },
   };
 
@@ -715,5 +857,7 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
     danmaku,
     sendChat,
     saveStatus,
+    replayId,
+    accountResult,
   };
 }

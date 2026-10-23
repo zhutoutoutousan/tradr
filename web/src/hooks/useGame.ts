@@ -19,6 +19,10 @@ import type { DealTrade, RoundReview } from "@/lib/game/reviews";
 import { instrumentLabel, type RoundSetup } from "@/lib/game/roundSetup";
 import type { GhostBotSpec } from "@/lib/sim/ghostReplay";
 import type { MarketOption } from "@/components/GameView";
+import { ReplayRecorder } from "@/lib/replay/recorder";
+import { saveReplay } from "@/lib/replay/storage";
+import type { ReplayRecording } from "@/lib/replay/types";
+import { saveAccountGame, type AccountGameResult } from "@/lib/game/accountHistory";
 
 export type GameConfig =
   | { kind: "synthetic"; seed: number; setup: RoundSetup; ghost?: GhostBotSpec }
@@ -75,6 +79,7 @@ export interface RoundResult {
   eloDelta: number;
   newAchievements: Achievement[];
   review: RoundReview;
+  replay?: ReplayRecording;
 }
 
 const SPEEDS = [1, 2, 5, 20] as const;
@@ -156,10 +161,18 @@ export function useGame(config: GameConfig, markets: MarketOption[] = []) {
   const engineRef = useRef<GameEngine | null>(null);
   const roundCandlesRef = useRef<Candle[]>([]);
   const roundInitRef = useRef(false);
+  const recorderRef = useRef<ReplayRecorder | null>(null);
   if (!engineRef.current) engineRef.current = buildEngine(config);
   if (!roundInitRef.current) {
     roundInitRef.current = true;
     roundCandlesRef.current = engineRef.current.market.candles.map((c) => ({ ...c }));
+    recorderRef.current = new ReplayRecorder(engineRef.current, {
+      mode: "solo",
+      marketId: config.setup.instrumentId,
+      marketLabel: `${instrumentLabel(config.setup.instrumentId, markets)} · ${config.setup.timeframeLabel}`,
+      msPerTick: 1000 / BASE_TPS,
+      me: { id: "you", name: "You", color: "#34d399" },
+    });
   }
 
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -169,6 +182,9 @@ export function useGame(config: GameConfig, markets: MarketOption[] = []) {
   const [timeLeftMs, setTimeLeftMs] = useState(roundMsRef.current);
   const [gameOver, setGameOver] = useState(false);
   const [result, setResult] = useState<RoundResult | null>(null);
+  const [replayId, setReplayId] = useState<string | null>(null);
+  const savedResultRef = useRef<string | null>(null);
+  const [accountResult, setAccountResult] = useState<AccountGameResult | null>(null);
 
   const runningRef = useRef(running);
   const speedRef = useRef<number>(SPEEDS[speedIdx]);
@@ -288,8 +304,45 @@ export function useGame(config: GameConfig, markets: MarketOption[] = []) {
       eloDelta: eloAfter - eloBefore,
       newAchievements,
       review,
+      replay: recorderRef.current?.finish(e),
     });
   }, [config, markets]);
+
+  // Persist the replay, then record the round on the signed-in account.
+  useEffect(() => {
+    if (!result || savedResultRef.current === result.review.id) return;
+    const e = engineRef.current!;
+    const id = result.review.id;
+    savedResultRef.current = id;
+    const replaySaved = result.replay
+      ? saveReplay(id, result.replay)
+          .then(() => {
+            setReplayId(id);
+            return id;
+          })
+          .catch((err) => {
+            console.warn("replay save failed", err);
+            return null;
+          })
+      : Promise.resolve(null);
+    const me = result.standings.find((t) => t.id === "you");
+    replaySaved
+      .then((rid) =>
+        saveAccountGame({
+          mode: "solo",
+          review: result.review,
+          setup: config.setup,
+          finalBalance: me?.equity ?? e.player.account.balance,
+          opponents: result.standings.filter((t) => t.id !== "you").map((t) => ({ rating: t.rating, equity: t.equity })),
+          myEquity: me?.equity ?? 0,
+          replayId: rid,
+        }),
+      )
+      .then((res) => {
+        if (res) setAccountResult(res);
+      })
+      .catch((err) => console.warn("account history save failed", err));
+  }, [result, config.setup]);
 
   const buildSnapshot = useCallback(() => {
     const e = engineRef.current!;
@@ -368,6 +421,7 @@ export function useGame(config: GameConfig, markets: MarketOption[] = []) {
         for (let i = 0; i < steps; i++) {
           const prevBar = e.market.bar;
           e.step();
+          recorderRef.current?.afterStep(e);
           if (e.market.bar > prevBar) {
             const closed = e.market.candles[e.market.candles.length - 1];
             if (closed) {
@@ -422,10 +476,15 @@ export function useGame(config: GameConfig, markets: MarketOption[] = []) {
     refreshPowerups();
   }, [applyEffects, refreshPowerups]);
 
+  const recordAction = (fn: () => void) => {
+    fn();
+    recorderRef.current?.syncPositions(engineRef.current!);
+  };
+
   const controls = {
-    long: () => engineRef.current!.playerLong(),
-    short: () => engineRef.current!.playerShort(),
-    close: () => engineRef.current!.playerClose(),
+    long: () => recordAction(() => engineRef.current!.playerLong()),
+    short: () => recordAction(() => engineRef.current!.playerShort()),
+    close: () => recordAction(() => engineRef.current!.playerClose()),
     setExposure: (x: number) => engineRef.current!.setPlayerExposure(x),
     togglePause: () => {
       if (gameOverRef.current) return;
@@ -446,6 +505,8 @@ export function useGame(config: GameConfig, markets: MarketOption[] = []) {
     roundMs: roundMsRef.current,
     gameOver,
     result,
+    replayId,
+    accountResult,
     powerups,
     controls,
   };

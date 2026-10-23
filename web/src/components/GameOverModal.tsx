@@ -1,6 +1,8 @@
 "use client";
 
 import type { RoundResult } from "@/hooks/useGame";
+import type { AccountGameResult } from "@/lib/game/accountHistory";
+import RoundAccountInfo from "@/components/RoundAccountInfo";
 
 function money(n: number) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -14,8 +16,12 @@ export default function GameOverModal({
   onMenu,
   onReview,
   onContinue,
+  replayId = null,
+  accountResult = null,
 }: {
   result: RoundResult;
+  replayId?: string | null;
+  accountResult?: AccountGameResult | null;
   onReplay: () => void;
   onMenu: () => void;
   onReview: () => void;
@@ -50,6 +56,8 @@ export default function GameOverModal({
             {eloDelta}
           </span>
         </div>
+
+        <RoundAccountInfo replayId={replayId} accountResult={accountResult} />
 
         {/* Round stats */}
         <div className="mt-4 grid grid-cols-4 gap-2 text-center">
