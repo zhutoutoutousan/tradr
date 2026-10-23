@@ -18,9 +18,20 @@ import { ReplayRecorder } from "@/lib/replay/recorder";
 import { saveReplay } from "@/lib/replay/storage";
 import type { ReplayEvent } from "@/lib/replay/types";
 import { saveAccountGame, type AccountGameResult } from "@/lib/game/accountHistory";
+import {
+  loadInstrumentIndex,
+  tallyVotes,
+  weightedPick,
+  type InstrumentOption,
+  type PickMode,
+} from "@/lib/sim/marketData";
+
+export type { InstrumentOption, PickMode } from "@/lib/sim/marketData";
 
 const MS_PER_TICK = 1000 / 9; // must match the synthetic feed's intended speed
 const COUNTDOWN_MS = 4000;
+// Extra time for every client to download a newly drawn market before the start.
+const MARKET_LOAD_MS = 2500;
 const ROUND_MS = 180_000; // 3-minute race, wall-clock synced from startEpoch
 const MAX_CATCHUP = 600;
 const STATS_HZ = 3;
@@ -63,12 +74,6 @@ export function multiplayerReplayId(room: string, roundNumber: number, startEpoc
   return `mp-${room}-r${roundNumber}-${startEpoch}`;
 }
 
-export interface InstrumentOption {
-  id: string;
-  name: string;
-  kind: string;
-}
-
 export interface LeaderRow {
   id: string;
   name: string;
@@ -109,6 +114,8 @@ interface PresenceMeta {
   instrumentVersion: number;
   role: MpRole;
   roundNumber: number;
+  vote?: string | null;
+  pickMode?: PickMode;
 }
 
 interface LiveStats {
@@ -158,6 +165,9 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
   const instrumentVersionRef = useRef<number>(0);
   const engineReadyRef = useRef<boolean>(true);
   const applyInstrumentRef = useRef<(id: string, version: number) => void>(() => {});
+  const myVoteRef = useRef<string | null>(null);
+  const pickModeRef = useRef<PickMode>("vote");
+  const instrumentsRef = useRef<InstrumentOption[]>([]);
 
   const [phase, setPhase] = useState<MpPhase>(supabaseEnabled ? "connecting" : "disabled");
   const [snapshot, setSnapshot] = useState<MpSnapshot | null>(null);
@@ -176,13 +186,16 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
   const [roundNumber, setRoundNumber] = useState(0);
   const [replayId, setReplayId] = useState<string | null>(null);
   const [accountResult, setAccountResult] = useState<AccountGameResult | null>(null);
+  const [myVote, setMyVote] = useState<string | null>(null);
+  const [voteCounts, setVoteCounts] = useState<Record<string, number>>({});
+  const [pickMode, setPickModeState] = useState<PickMode>("vote");
 
   // Load the catalogue of real markets once.
   useEffect(() => {
-    fetch("/data/index.json")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((list: InstrumentOption[]) => setInstruments(list))
-      .catch(() => setInstruments([]));
+    loadInstrumentIndex().then((list) => {
+      instrumentsRef.current = list;
+      setInstruments(list);
+    });
   }, []);
 
   // Track stable membership info. Called sparingly (join / start / instrument
@@ -199,6 +212,8 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
         instrumentVersion: instrumentVersionRef.current,
         role: roleRef.current,
         roundNumber: roundNumberRef.current,
+        vote: myVoteRef.current,
+        pickMode: pickModeRef.current,
         ...partial,
       };
       ch.track(meta);
@@ -381,6 +396,18 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
         }
       }
       setIsHost(hostId === myIdRef.current);
+      const hostMode = flat[hostId]?.pickMode;
+      if (hostMode && hostId !== myIdRef.current) {
+        pickModeRef.current = hostMode;
+        setPickModeState(hostMode);
+      }
+      setVoteCounts(
+        tallyVotes(
+          ids
+            .filter((id) => (flat[id]?.role ?? "player") === "player")
+            .map((id) => (id === myIdRef.current ? myVoteRef.current : flat[id]?.vote)),
+        ),
+      );
 
       // Adopt the instrument with the newest version anywhere in the room. This
       // is independent of "host" detection, so a pick is never reverted by a
@@ -636,16 +663,59 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
     [applyInstrument, pushPresence],
   );
 
+  const vote = useCallback(
+    (id: string) => {
+      if (startEpochRef.current != null || roleRef.current !== "player") return;
+      const next = myVoteRef.current === id ? null : id;
+      myVoteRef.current = next;
+      setMyVote(next);
+      pushPresence();
+      const flat = presenceRef.current;
+      setVoteCounts(
+        tallyVotes(
+          Object.keys(flat)
+            .filter((k) => (flat[k]?.role ?? "player") === "player")
+            .map((k) => (k === myIdRef.current ? next : flat[k]?.vote)),
+        ),
+      );
+    },
+    [pushPresence],
+  );
+
+  const setPickMode = useCallback(
+    (mode: PickMode) => {
+      pickModeRef.current = mode;
+      setPickModeState(mode);
+      pushPresence();
+    },
+    [pushPresence],
+  );
+
+  // Host: draw the market (weighted by votes, or the host's own pick) and schedule the race.
   const start = useCallback(() => {
     if (startEpochRef.current != null) return;
-    const epoch = Date.now() + COUNTDOWN_MS;
+    const flat = presenceRef.current;
+    const counts =
+      pickModeRef.current === "host"
+        ? tallyVotes([myVoteRef.current])
+        : tallyVotes(
+            Object.keys(flat)
+              .filter((k) => (flat[k]?.role ?? "player") === "player")
+              .map((k) => (k === myIdRef.current ? myVoteRef.current : flat[k]?.vote)),
+          );
+    const pick = weightedPick(counts, instrumentsRef.current);
+    const changed = pick !== instrumentRef.current;
+    const version = Date.now();
+    if (changed) applyInstrument(pick, version);
+    const epoch = Date.now() + COUNTDOWN_MS + (changed ? MARKET_LOAD_MS : 0);
     startEpochRef.current = epoch;
     savedRoundRef.current = false;
     setSaveStatus("idle");
-    roundCandlesRef.current = engineRef.current!.market.candles.map((c) => ({ ...c }));
-    pushPresence({ startEpoch: epoch });
-    channelRef.current?.send({ type: "broadcast", event: "control", payload: { startEpoch: epoch } });
-  }, [pushPresence]);
+    if (engineReadyRef.current) roundCandlesRef.current = engineRef.current!.market.candles.map((c) => ({ ...c }));
+    const inst = changed ? { instrument: pick, instrumentVersion: version } : {};
+    pushPresence({ startEpoch: epoch, ...inst });
+    channelRef.current?.send({ type: "broadcast", event: "control", payload: { startEpoch: epoch, ...inst } });
+  }, [applyInstrument, pushPresence]);
 
   const rematch = useCallback(() => {
     const rn = roundNumberRef.current + 1;
@@ -853,6 +923,11 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
     selectedInstrument,
     setInstrument,
     instrumentLoading,
+    myVote,
+    voteCounts,
+    vote,
+    pickMode,
+    setPickMode,
     chatMessages,
     danmaku,
     sendChat,

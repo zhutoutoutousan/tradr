@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import CandleChart from "@/components/CandleChart";
 import DanmakuOverlay from "@/components/DanmakuOverlay";
@@ -8,6 +8,7 @@ import RoomChat from "@/components/RoomChat";
 import RoomQRShare from "@/components/RoomQRShare";
 import ShareButtons from "@/components/ShareButtons";
 import RoundAccountInfo from "@/components/RoundAccountInfo";
+import { MarketVote } from "@/components/MarketVote";
 import { useMultiplayer, type MpRole } from "@/hooks/useMultiplayer";
 import type { MpSession } from "@/hooks/useLocalMultiplayer";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -30,15 +31,8 @@ function clock(ms: number) {
 
 const ORDINAL = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
 
-const KIND_LABELS: Record<string, string> = {
-  forex: "Forex",
-  commodity: "Commodities",
-  crypto: "Crypto",
-  stock: "Stocks",
-};
-
 // Bump on each deploy so a stale cached build is obvious on every device.
-const BUILD_TAG = "v3.11.0-local-race";
+const BUILD_TAG = "v3.12.0-multi-vote";
 
 export default function MultiplayerGame({
   room,
@@ -61,11 +55,14 @@ export function MultiplayerGameView({
   onLeave,
   session,
   local = false,
+  lobbyExtra,
 }: {
   room: string;
   onLeave: () => void;
   session: MpSession;
   local?: boolean;
+  /** Extra controls shown in the lobby (e.g. adding local players). */
+  lobbyExtra?: ReactNode;
 }) {
   const {
     phase,
@@ -82,9 +79,12 @@ export function MultiplayerGameView({
     rematch,
     controls,
     instruments,
-    selectedInstrument,
-    setInstrument,
     instrumentLoading,
+    myVote,
+    voteCounts,
+    vote,
+    pickMode,
+    setPickMode,
     chatMessages,
     danmaku,
     sendChat,
@@ -205,28 +205,6 @@ export function MultiplayerGameView({
   const humanCount = humans.length;
   const totalRacers = snapshot.leaderboard.length;
   const priceDecimals = snapshot.price < 10 ? 4 : 2;
-
-  const grouped: Record<string, typeof instruments> = {};
-  for (const m of instruments) (grouped[m.kind] ??= []).push(m);
-  const instrumentPicker = (
-    <select
-      value={selectedInstrument}
-      onChange={(e) => setInstrument(e.target.value)}
-      disabled={!isHost || phase !== "lobby"}
-      className="rounded-md border border-slate-700 bg-slate-800 px-2 py-2 text-sm outline-none focus:border-emerald-500 disabled:opacity-60"
-    >
-      <option value="synthetic">Random (synthetic)</option>
-      {Object.entries(grouped).map(([kind, opts]) => (
-        <optgroup key={kind} label={KIND_LABELS[kind] ?? kind}>
-          {opts.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </optgroup>
-      ))}
-    </select>
-  );
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-slate-950 text-slate-100">
@@ -379,7 +357,7 @@ export function MultiplayerGameView({
                     <div className="text-lg font-semibold">Waiting in the lobby</div>
                     <div className="mt-1 max-w-sm text-sm text-slate-400">
                       {local ? (
-                        "Direkt verbunden, ohne Internet. Ihr handelt beide exakt denselben Markt."
+                        "Direkt verbunden, ohne Internet. Alle handeln exakt denselben Markt."
                       ) : (
                         <>
                           Share room code <span className="font-mono text-emerald-300">{room}</span> with friends.
@@ -403,24 +381,30 @@ export function MultiplayerGameView({
                       {humanCount === 1 && (
                         <div className="mt-2 text-xs text-amber-400/90">
                           {local
-                            ? "Verbindung zum Mitspieler unterbrochen."
+                            ? isHost
+                              ? "Noch keine Mitspieler verbunden – füge welche hinzu."
+                              : "Verbindung zum Host unterbrochen."
                             : "Only you so far — send the invite link and have them open it fresh."}
                         </div>
                       )}
                     </div>
 
-                    {!local && (
-                    <div className="mt-4 flex flex-col items-center gap-1">
-                      <span className="text-xs uppercase tracking-wide text-slate-500">Instrument</span>
-                      {instrumentPicker}
-                      <span className="h-4 text-xs text-slate-500">
-                        {instrumentLoading
-                          ? "Loading market data…"
-                          : isHost
-                            ? "You pick the market for everyone"
-                            : "Set by the host"}
-                      </span>
-                    </div>
+                    {lobbyExtra && <div className="mt-3">{lobbyExtra}</div>}
+
+                    {!isSpectator && (
+                      <div className="mt-4 flex w-full flex-col items-center">
+                        <MarketVote
+                          instruments={instruments}
+                          voteCounts={voteCounts}
+                          myVote={myVote}
+                          onVote={vote}
+                          pickMode={pickMode}
+                          onPickMode={setPickMode}
+                          isHost={isHost}
+                          disabled={instrumentLoading}
+                          local={local}
+                        />
+                      </div>
                     )}
 
                     {!local && (
@@ -437,7 +421,11 @@ export function MultiplayerGameView({
                         disabled={instrumentLoading}
                         className="mt-4 rounded-lg bg-emerald-500 px-6 py-3 font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-50"
                       >
-                        ▶ Start 3-minute race
+                        {instrumentLoading
+                          ? local
+                            ? "Markt wird geladen…"
+                            : "Loading market…"
+                          : "▶ Start 3-minute race"}
                       </button>
                     ) : (
                       <div className="mt-4 text-sm text-slate-500">Waiting for the host to start…</div>

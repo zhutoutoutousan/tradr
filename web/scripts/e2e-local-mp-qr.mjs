@@ -78,6 +78,7 @@ console.log(`host lobby with start button: ${startBtn}`);
 let raceOk = false;
 if (startBtn) {
   await guest.page.waitForSelector('text=Waiting for the host to start', { timeout: 15000 });
+  await host.page.screenshot({ path: '/tmp/host-lobby.png' });
   await host.page.click('button:has-text("Start 3-minute race")');
   const live = await Promise.all([host.page, guest.page].map((p) =>
     p.waitForSelector('text=/Live · bar/', { timeout: 15000 }).then(() => true, () => false)));

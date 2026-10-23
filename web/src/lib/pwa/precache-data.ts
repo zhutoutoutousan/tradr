@@ -77,8 +77,6 @@ export async function getCachedMarketData(symbol: string): Promise<any | null> {
 export async function isPrecached(): Promise<boolean> {
   try {
     const firstSymbol = MARKET_SYMBOLS[0];
-
-const FRESH_MS = 24 * 60 * 60 * 1000;
     const cached = await offlineStorage.getCachedData(`market-${firstSymbol}`);
     return !!cached;
   } catch {

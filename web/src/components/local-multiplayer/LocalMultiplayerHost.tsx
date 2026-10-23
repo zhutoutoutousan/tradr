@@ -13,9 +13,11 @@ interface LocalMultiplayerHostProps {
   username: string;
   onConnected: (remoteUsername: string) => void;
   onCancel: () => void;
+  /** Adding another player to a running session: keep the existing guests connected. */
+  addingPlayer?: boolean;
 }
 
-export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalMultiplayerHostProps) {
+export function LocalMultiplayerHost({ username, onConnected, onCancel, addingPlayer = false }: LocalMultiplayerHostProps) {
   const [offerCode, setOfferCode] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [waitingForAnswer, setWaitingForAnswer] = useState(false);
@@ -34,20 +36,23 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
     answerSubmittedRef.current = answerSubmitted;
     if (!answerSubmitted) return;
     const timer = window.setTimeout(() => {
-      if (!webrtcManager.isConnected()) setTrouble(reportConnectionTrouble('host', 'timeout'));
+      if (webrtcManager.getConnectionState() !== 'connected') setTrouble(reportConnectionTrouble('host', 'timeout'));
     }, CONNECT_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
   }, [answerSubmitted, attempt]);
 
   useEffect(() => {
+    let cancelled = false;
     async function createOffer() {
       try {
         console.log('[LocalMP Host] Creating offer...');
         const code = await webrtcManager.createOffer(username);
+        if (cancelled) return;
         setOfferCode(code);
         setWaitingForAnswer(true);
         setLoading(false);
       } catch (err) {
+        if (cancelled) return;
         console.error('[LocalMP Host] Failed to create offer:', err);
         setError('Fehler beim Erstellen des Spiels');
         setLoading(false);
@@ -70,12 +75,18 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
     });
 
     return () => {
+      cancelled = true;
       unsubscribe();
     };
   }, [username, onConnected, attempt]);
 
+  const cancel = () => {
+    webrtcManager.cancelPending();
+    onCancel();
+  };
+
   const retry = () => {
-    webrtcManager.disconnect();
+    webrtcManager.cancelPending();
     scanHandledRef.current = false;
     answerSubmittedRef.current = false;
     setTrouble(null);
@@ -166,7 +177,7 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
   }
 
   if (trouble) {
-    return <ConnectionTrouble diagnostics={trouble} onRetry={retry} onCancel={onCancel} />;
+    return <ConnectionTrouble diagnostics={trouble} onRetry={retry} onCancel={cancel} />;
   }
 
   if (error) {
@@ -174,7 +185,7 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
       <div className="flex flex-col items-center justify-center p-8">
         <div className="text-red-400 mb-4">{error}</div>
         <button
-          onClick={onCancel}
+          onClick={cancel}
           className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-white"
         >
           Zurück
@@ -199,6 +210,7 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
   return (
     <div className="flex flex-col items-center p-4 md:p-8 max-w-2xl mx-auto">
       {/* Connection Info Banner */}
+      {!addingPlayer && (
       <div className="mb-6 w-full max-w-md rounded-xl border border-blue-500/30 bg-blue-500/5 p-4 text-sm">
         <div className="mb-2 flex items-center gap-2 font-semibold text-blue-400">
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -213,9 +225,10 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
           <li className="text-amber-400">⚠️ Flugmodus deaktiviert meist Hotspot-Funktion</li>
         </ul>
       </div>
+      )}
 
       <h2 className="text-2xl font-bold text-white mb-2">
-        🎮 Lokales Multiplayer-Spiel
+        {addingPlayer ? '➕ Weiteren Spieler hinzufügen' : '🎮 Lokales Multiplayer-Spiel'}
       </h2>
       <p className="text-slate-400 mb-6 text-center">
         Zeige diesen QR-Code deinem Mitspieler
@@ -374,7 +387,7 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
 
       {/* Cancel Button */}
       <button
-        onClick={onCancel}
+        onClick={cancel}
         className="mt-6 text-sm text-slate-400 hover:text-white transition-colors"
       >
         ← Abbrechen

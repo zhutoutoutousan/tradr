@@ -92,185 +92,94 @@ export interface PeerInfo {
   username: string;
 }
 
-class WebRTCManager {
-  private peerConnection: RTCPeerConnection | null = null;
-  private dataChannel: RTCDataChannel | null = null;
-  private role: PeerRole | null = null;
-  private localInfo: PeerInfo | null = null;
-  private remoteInfo: PeerInfo | null = null;
-  private onMessageCallbacks: Set<(message: PeerMessage) => void> = new Set();
-  private onStateChangeCallbacks: Set<(state: ConnectionState) => void> = new Set();
-  private connectionState: ConnectionState = 'disconnected';
-  private remoteSdp = '';
+/** The id a guest uses for its single link to the host. */
+export const HOST_PEER_ID = 'host';
 
-  constructor() {
-    if (typeof window === 'undefined') return;
-  }
+interface LinkEvents {
+  onIceState: (link: PeerLink, state: RTCIceConnectionState) => void;
+  onOpen: (link: PeerLink) => void;
+  onClose: (link: PeerLink) => void;
+  onMessage: (link: PeerLink, message: PeerMessage) => void;
+}
 
-  async createOffer(username: string): Promise<string> {
-    this.disconnect();
-    this.role = 'host';
-    this.localInfo = { id: randomId(), role: 'host', username };
-    await unlockLanAddresses();
-    this.peerConnection = new RTCPeerConnection(RTC_CONFIG);
-    this.setupPeerConnection();
+/** One RTCPeerConnection + data channel to a single remote device. */
+class PeerLink {
+  readonly pc: RTCPeerConnection;
+  channel: RTCDataChannel | null = null;
+  remoteName = '';
+  remoteSdp = '';
+  open = false;
+  closed = false;
 
-    this.dataChannel = this.peerConnection.createDataChannel('game', {
-      ordered: true,
-    });
-    this.setupDataChannel(this.dataChannel);
-
-    const offer = await this.peerConnection.createOffer();
-    await this.peerConnection.setLocalDescription(offer);
-
-    await this.waitForICEGathering();
-
-    console.log('[WebRTC] Local candidates:', describeSummary(summarizeCandidates(this.peerConnection.localDescription!.sdp)));
-    return encodeSignal(this.peerConnection.localDescription!, username);
-  }
-
-  async acceptOffer(offerString: string, username: string): Promise<string> {
-    const offerData = decodeSignal(offerString);
-    this.disconnect();
-    this.role = 'guest';
-    this.localInfo = { id: randomId(), role: 'guest', username };
-    this.remoteInfo = { id: randomId(), role: 'host', username: offerData.username };
-    this.remoteSdp = offerData.description.sdp ?? '';
-    console.log('[WebRTC] Offer candidates:', describeSummary(summarizeCandidates(this.remoteSdp)));
-
-    await unlockLanAddresses();
-    this.peerConnection = new RTCPeerConnection(RTC_CONFIG);
-    this.setupPeerConnection();
-
-    await this.peerConnection.setRemoteDescription(
-      new RTCSessionDescription(offerData.description)
-    );
-
-    const answer = await this.peerConnection.createAnswer();
-    await this.peerConnection.setLocalDescription(answer);
-
-    await this.waitForICEGathering();
-
-    console.log('[WebRTC] Local candidates:', describeSummary(summarizeCandidates(this.peerConnection.localDescription!.sdp)));
-    return encodeSignal(this.peerConnection.localDescription!, username);
-  }
-
-  async processAnswer(answerString: string): Promise<void> {
-    if (!this.peerConnection) {
-      throw new Error('No peer connection');
-    }
-
-    const answerData = decodeSignal(answerString);
-    this.remoteInfo = { id: randomId(), role: 'guest', username: answerData.username };
-    this.remoteSdp = answerData.description.sdp ?? '';
-    console.log('[WebRTC] Answer candidates:', describeSummary(summarizeCandidates(this.remoteSdp)));
-
-    await this.peerConnection.setRemoteDescription(
-      new RTCSessionDescription(answerData.description)
-    );
-  }
-
-  private setupPeerConnection() {
-    const pc = this.peerConnection;
-    if (!pc) return;
-
+  constructor(readonly id: string, private events: LinkEvents) {
+    const pc = new RTCPeerConnection(RTC_CONFIG);
+    this.pc = pc;
     pc.oniceconnectionstatechange = () => {
-      if (this.peerConnection !== pc) return;
-      const state = pc.iceConnectionState;
-      console.log('[WebRTC] ICE connection state:', state);
-
-      // ICE can reach "connected" on the guest before the host has even scanned
-      // the answer (the host replies to connectivity checks), so "connected" is
-      // only reported once the data channel opens.
-      // "disconnected" is often transient (ICE recovers on its own), only "failed" is final.
-      if (state === 'failed') {
-        this.setConnectionState('failed');
-      } else if (state === 'checking') {
-        this.setConnectionState('connecting');
-      }
+      if (this.closed) return;
+      console.log('[WebRTC] ICE connection state:', pc.iceConnectionState);
+      this.events.onIceState(this, pc.iceConnectionState);
     };
-
     pc.onicecandidateerror = (event) => {
       const e = event as RTCPeerConnectionIceErrorEvent;
       if (e.errorCode !== 701) console.warn('[WebRTC] ICE candidate error:', e.errorCode, e.errorText);
     };
-
     pc.ondatachannel = (event) => {
-      if (this.peerConnection !== pc) return;
+      if (this.closed) return;
       console.log('[WebRTC] Data channel received');
-      this.dataChannel = event.channel;
-      this.setupDataChannel(this.dataChannel);
+      this.attach(event.channel);
     };
-
     pc.onconnectionstatechange = () => {
       console.log('[WebRTC] Connection state:', pc.connectionState);
     };
   }
 
-  private setupDataChannel(channel: RTCDataChannel) {
+  attach(channel: RTCDataChannel) {
+    this.channel = channel;
     channel.onopen = () => {
-      if (this.dataChannel !== channel) return;
+      if (this.closed || this.channel !== channel) return;
       console.log('[WebRTC] Data channel open');
-      this.setConnectionState('connected');
+      this.open = true;
+      this.events.onOpen(this);
     };
-
     channel.onclose = () => {
-      if (this.dataChannel !== channel) return;
+      if (this.closed || this.channel !== channel) return;
       console.log('[WebRTC] Data channel closed');
-      this.setConnectionState('disconnected');
+      this.close();
     };
-
     channel.onerror = (error) => {
-      if (this.dataChannel !== channel) return;
+      if (this.closed || this.channel !== channel) return;
       console.error('[WebRTC] Data channel error:', error);
-      this.setConnectionState('failed');
     };
-
     channel.onmessage = (event) => {
       try {
-        const message: PeerMessage = JSON.parse(event.data);
-        this.notifyMessageListeners(message);
+        this.events.onMessage(this, JSON.parse(event.data) as PeerMessage);
       } catch (error) {
         console.error('[WebRTC] Failed to parse message:', error);
       }
     };
   }
 
-  private async waitForICEGathering(): Promise<void> {
-    return new Promise((resolve) => {
-      if (this.peerConnection?.iceGatheringState === 'complete') {
-        resolve();
-        return;
-      }
-
-      const checkState = () => {
-        if (this.peerConnection?.iceGatheringState === 'complete') {
-          this.peerConnection.removeEventListener('icegatheringstatechange', checkState);
-          resolve();
-        }
+  async gather(): Promise<void> {
+    const pc = this.pc;
+    if (pc.iceGatheringState === 'complete') return;
+    await new Promise<void>((resolve) => {
+      const check = () => {
+        if (pc.iceGatheringState === 'complete') done();
       };
-
-      this.peerConnection?.addEventListener('icegatheringstatechange', checkState);
-
-      setTimeout(() => {
-        this.peerConnection?.removeEventListener('icegatheringstatechange', checkState);
+      const timer = setTimeout(() => done(), 5000);
+      const done = () => {
+        clearTimeout(timer);
+        pc.removeEventListener('icegatheringstatechange', check);
         resolve();
-      }, 5000);
+      };
+      pc.addEventListener('icegatheringstatechange', check);
     });
   }
 
-  sendMessage(message: Omit<PeerMessage, 'timestamp'>): boolean {
-    if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
-      console.warn('[WebRTC] Cannot send message, channel not open');
-      return false;
-    }
-
+  send(text: string): boolean {
+    if (!this.channel || this.channel.readyState !== 'open') return false;
     try {
-      const fullMessage: PeerMessage = {
-        ...message,
-        timestamp: Date.now()
-      };
-      this.dataChannel.send(JSON.stringify(fullMessage));
+      this.channel.send(text);
       return true;
     } catch (error) {
       console.error('[WebRTC] Failed to send message:', error);
@@ -278,7 +187,144 @@ class WebRTCManager {
     }
   }
 
-  onMessage(callback: (message: PeerMessage) => void): () => void {
+  close() {
+    if (this.closed) return;
+    this.closed = true;
+    const wasOpen = this.open;
+    this.open = false;
+    try {
+      this.channel?.close();
+    } catch {}
+    this.pc.close();
+    if (wasOpen) this.events.onClose(this);
+  }
+
+  diagnostics(): ConnectionDiagnostics {
+    return {
+      local: summarizeCandidates(this.pc.localDescription?.sdp ?? ''),
+      remote: summarizeCandidates(this.remoteSdp),
+      iceState: this.pc.iceConnectionState,
+      connectionState: this.pc.connectionState,
+      gatheringState: this.pc.iceGatheringState,
+    };
+  }
+}
+
+/**
+ * Star topology: a guest has one link to the host, the host has one link per
+ * guest and can keep issuing new offers to add more players. The connection
+ * state reported via onStateChange is that of the handshake in progress.
+ */
+class WebRTCManager {
+  private links = new Map<string, PeerLink>();
+  private pending: PeerLink | null = null;
+  private lastConnected: PeerLink | null = null;
+  private role: PeerRole | null = null;
+  private localInfo: PeerInfo | null = null;
+  private onMessageCallbacks: Set<(message: PeerMessage, from: string) => void> = new Set();
+  private onStateChangeCallbacks: Set<(state: ConnectionState) => void> = new Set();
+  private onPeersChangeCallbacks: Set<(peers: PeerInfo[]) => void> = new Set();
+  private connectionState: ConnectionState = 'disconnected';
+  private nextGuest = 1;
+  private offerToken = 0;
+
+  private events: LinkEvents = {
+    onIceState: (link, state) => {
+      if (link !== this.pending) return;
+      // ICE can reach "connected" on the guest before the host has even scanned
+      // the answer (the host replies to connectivity checks), so "connected" is
+      // only reported once the data channel opens.
+      // "disconnected" is often transient (ICE recovers on its own), only "failed" is final.
+      if (state === 'failed') this.setConnectionState('failed');
+      else if (state === 'checking') this.setConnectionState('connecting');
+    },
+    onOpen: (link) => {
+      this.links.set(link.id, link);
+      this.lastConnected = link;
+      if (this.pending === link) {
+        this.pending = null;
+        this.setConnectionState('connected');
+      }
+      this.notifyPeers();
+    },
+    onClose: (link) => {
+      if (this.links.get(link.id) === link) this.links.delete(link.id);
+      if (this.role === 'guest') this.setConnectionState('disconnected');
+      this.notifyPeers();
+    },
+    onMessage: (link, message) => {
+      this.onMessageCallbacks.forEach((cb) => cb(message, link.id));
+    },
+  };
+
+  /** Host: create an offer for one more guest. Already connected guests stay connected. */
+  async createOffer(username: string): Promise<string> {
+    if (this.role !== 'host') this.disconnect();
+    this.cancelPending();
+    this.role = 'host';
+    this.localInfo = { id: HOST_PEER_ID, role: 'host', username };
+    this.setConnectionState('disconnected');
+    const token = this.offerToken;
+    await unlockLanAddresses();
+    if (token !== this.offerToken) throw new Error('Offer cancelled');
+    const link = new PeerLink(`p${this.nextGuest++}-${randomId().slice(0, 4)}`, this.events);
+    this.pending = link;
+    link.attach(link.pc.createDataChannel('game', { ordered: true }));
+    await link.pc.setLocalDescription(await link.pc.createOffer());
+    await link.gather();
+    if (link.closed) throw new Error('Offer cancelled');
+    console.log('[WebRTC] Local candidates:', describeSummary(summarizeCandidates(link.pc.localDescription!.sdp)));
+    return encodeSignal(link.pc.localDescription!, username);
+  }
+
+  async acceptOffer(offerString: string, username: string): Promise<string> {
+    const offerData = decodeSignal(offerString);
+    this.disconnect();
+    this.role = 'guest';
+    this.localInfo = { id: randomId(), role: 'guest', username };
+    await unlockLanAddresses();
+    const link = new PeerLink(HOST_PEER_ID, this.events);
+    link.remoteName = offerData.username;
+    link.remoteSdp = offerData.description.sdp ?? '';
+    console.log('[WebRTC] Offer candidates:', describeSummary(summarizeCandidates(link.remoteSdp)));
+    this.pending = link;
+    await link.pc.setRemoteDescription(new RTCSessionDescription(offerData.description));
+    await link.pc.setLocalDescription(await link.pc.createAnswer());
+    await link.gather();
+    console.log('[WebRTC] Local candidates:', describeSummary(summarizeCandidates(link.pc.localDescription!.sdp)));
+    return encodeSignal(link.pc.localDescription!, username);
+  }
+
+  async processAnswer(answerString: string): Promise<void> {
+    const link = this.pending;
+    if (!link || this.role !== 'host') throw new Error('No peer connection');
+    const answerData = decodeSignal(answerString);
+    link.remoteName = answerData.username;
+    link.remoteSdp = answerData.description.sdp ?? '';
+    console.log('[WebRTC] Answer candidates:', describeSummary(summarizeCandidates(link.remoteSdp)));
+    await link.pc.setRemoteDescription(new RTCSessionDescription(answerData.description));
+  }
+
+  /** Abort the handshake in progress without touching connected peers. */
+  cancelPending() {
+    const link = this.pending;
+    this.pending = null;
+    this.offerToken++;
+    link?.close();
+    this.setConnectionState('disconnected');
+  }
+
+  /** Send to one peer, or to every connected peer when `to` is omitted. */
+  sendMessage(message: Omit<PeerMessage, 'timestamp'>, to?: string): boolean {
+    const text = JSON.stringify({ ...message, timestamp: Date.now() });
+    if (to) return this.links.get(to)?.send(text) ?? false;
+    let sent = false;
+    for (const link of this.links.values()) sent = link.send(text) || sent;
+    if (!sent) console.warn('[WebRTC] Cannot send message, no open channel');
+    return sent;
+  }
+
+  onMessage(callback: (message: PeerMessage, from: string) => void): () => void {
     this.onMessageCallbacks.add(callback);
     return () => this.onMessageCallbacks.delete(callback);
   }
@@ -289,8 +335,20 @@ class WebRTCManager {
     return () => this.onStateChangeCallbacks.delete(callback);
   }
 
-  private notifyMessageListeners(message: PeerMessage) {
-    this.onMessageCallbacks.forEach(callback => callback(message));
+  onPeersChange(callback: (peers: PeerInfo[]) => void): () => void {
+    this.onPeersChangeCallbacks.add(callback);
+    callback(this.getPeers());
+    return () => this.onPeersChangeCallbacks.delete(callback);
+  }
+
+  getPeers(): PeerInfo[] {
+    const role: PeerRole = this.role === 'host' ? 'guest' : 'host';
+    return [...this.links.values()].map((l) => ({ id: l.id, role, username: l.remoteName }));
+  }
+
+  private notifyPeers() {
+    const peers = this.getPeers();
+    this.onPeersChangeCallbacks.forEach((cb) => cb(peers));
   }
 
   private setConnectionState(state: ConnectionState) {
@@ -300,40 +358,36 @@ class WebRTCManager {
   }
 
   getDiagnostics(): ConnectionDiagnostics {
-    const pc = this.peerConnection;
-    return {
-      local: summarizeCandidates(pc?.localDescription?.sdp ?? ''),
-      remote: summarizeCandidates(this.remoteSdp),
-      iceState: pc?.iceConnectionState ?? 'none',
-      connectionState: pc?.connectionState ?? 'none',
-      gatheringState: pc?.iceGatheringState ?? 'none',
-    };
+    const link = this.pending ?? this.lastConnected;
+    if (link) return link.diagnostics();
+    const none = summarizeCandidates('');
+    return { local: none, remote: none, iceState: 'none', connectionState: 'none', gatheringState: 'none' };
   }
 
+  /** Close every link. */
   disconnect() {
-    if (this.dataChannel) {
-      this.dataChannel.close();
-      this.dataChannel = null;
-    }
-
-    if (this.peerConnection) {
-      this.peerConnection.close();
-      this.peerConnection = null;
-    }
-
+    this.offerToken++;
+    this.pending?.close();
+    this.pending = null;
+    const links = [...this.links.values()];
+    this.links.clear();
+    links.forEach((l) => l.close());
+    this.lastConnected = null;
     this.setConnectionState('disconnected');
     this.role = null;
     this.localInfo = null;
-    this.remoteInfo = null;
-    this.remoteSdp = '';
+    this.notifyPeers();
   }
 
   getLocalInfo(): PeerInfo | null {
     return this.localInfo;
   }
 
+  /** The peer whose handshake completed most recently. */
   getRemoteInfo(): PeerInfo | null {
-    return this.remoteInfo;
+    const l = this.lastConnected;
+    if (!l) return null;
+    return { id: l.id, role: this.role === 'host' ? 'guest' : 'host', username: l.remoteName };
   }
 
   getRole(): PeerRole | null {
@@ -344,8 +398,9 @@ class WebRTCManager {
     return this.connectionState;
   }
 
+  /** True while at least one peer is connected. */
   isConnected(): boolean {
-    return this.connectionState === 'connected';
+    return this.links.size > 0;
   }
 }
 

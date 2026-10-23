@@ -131,7 +131,7 @@ export function LocalMultiplayerMenu({ onStartGame, onCancel }: LocalMultiplayer
         Lokales Multiplayer
       </h1>
       <p className="text-slate-400 mb-6 text-center max-w-md">
-        Spiele mit jemandem in deiner Nähe über lokales Netzwerk
+        Spiele mit Leuten in deiner Nähe über lokales Netzwerk – zu zweit oder mit mehreren
       </p>
 
       {/* Network Requirements - IMPORTANT */}
@@ -223,7 +223,8 @@ export function LocalMultiplayerMenu({ onStartGame, onCancel }: LocalMultiplayer
           <div className="flex items-start gap-3">
             <span className="text-lg">4️⃣</span>
             <div>
-              <span className="font-semibold text-white">Spielen!</span> Über lokales Netzwerk (kein Internet nötig)
+              <span className="font-semibold text-white">Spielen!</span> Über lokales Netzwerk (kein Internet nötig).
+              Weitere Spieler fügt der Host in der Lobby per neuem QR-Code hinzu.
             </div>
           </div>
         </div>
