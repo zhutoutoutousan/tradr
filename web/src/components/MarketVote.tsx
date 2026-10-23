@@ -146,7 +146,7 @@ export function MarketVote({
         />
       )}
 
-      <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
+      <div className="max-h-36 space-y-2 sm:max-h-44 overflow-y-auto pr-1">
         {instruments.length === 0 && (
           <div className="text-xs text-slate-500">{t("Loading markets…", "Lade Märkte…")}</div>
         )}

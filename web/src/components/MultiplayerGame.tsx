@@ -32,7 +32,7 @@ function clock(ms: number) {
 const ORDINAL = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
 
 // Bump on each deploy so a stale cached build is obvious on every device.
-const BUILD_TAG = "v3.12.0-multi-vote";
+const BUILD_TAG = "v3.12.1-lobby-fit";
 
 export default function MultiplayerGame({
   room,
@@ -346,14 +346,18 @@ export function MultiplayerGameView({
             </div>
 
             {phase !== "running" && phase !== "finished" && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-y-auto rounded-xl bg-slate-950/80 p-3 backdrop-blur-sm">
+              <div
+                className="absolute inset-0 flex flex-col items-center overflow-y-auto overscroll-contain rounded-xl bg-slate-950/80 p-3 pb-0 backdrop-blur-sm"
+                data-testid="mp-lobby-overlay"
+              >
                 {phase === "countdown" ? (
-                  <div className="text-center">
+                  <div className="my-auto text-center">
                     <div className="text-6xl font-extrabold text-emerald-400">{secondsToStart}</div>
                     <div className="mt-2 text-slate-400">Get ready…</div>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center text-center">
+                  // my-auto centers when it fits; justify-center would clip the top and bottom when it doesn't.
+                  <div className="my-auto flex w-full flex-col items-center text-center">
                     <div className="text-lg font-semibold">Waiting in the lobby</div>
                     <div className="mt-1 max-w-sm text-sm text-slate-400">
                       {local ? (
@@ -415,21 +419,23 @@ export function MultiplayerGameView({
                         {copied ? "✓ Invite link copied" : "Copy invite link"}
                       </button>
                     )}
-                    {isHost ? (
-                      <button
-                        onClick={start}
-                        disabled={instrumentLoading}
-                        className="mt-4 rounded-lg bg-emerald-500 px-6 py-3 font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-50"
-                      >
-                        {instrumentLoading
-                          ? local
-                            ? "Markt wird geladen…"
-                            : "Loading market…"
-                          : "▶ Start 3-minute race"}
-                      </button>
-                    ) : (
-                      <div className="mt-4 text-sm text-slate-500">Waiting for the host to start…</div>
-                    )}
+                    <div className="sticky bottom-0 z-10 mt-3 flex w-full justify-center bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent pb-3 pt-4">
+                      {isHost ? (
+                        <button
+                          onClick={start}
+                          disabled={instrumentLoading}
+                          className="rounded-lg bg-emerald-500 px-6 py-3 font-bold text-slate-950 shadow-lg shadow-slate-950/60 hover:bg-emerald-400 disabled:opacity-50"
+                        >
+                          {instrumentLoading
+                            ? local
+                              ? "Markt wird geladen…"
+                              : "Loading market…"
+                            : "▶ Start 3-minute race"}
+                        </button>
+                      ) : (
+                        <div className="text-sm text-slate-400">Waiting for the host to start…</div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -640,8 +646,8 @@ export function MultiplayerGameView({
         </>
       )}
 
-      {/* Mobile sticky trade bar */}
-      <div className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-3 gap-2 border-t border-slate-800 bg-slate-900/95 p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
+      {/* Mobile sticky trade bar; hidden in the lobby, where it would cover the start button */}
+      <div className={`${phase === "lobby" || phase === "countdown" ? "hidden" : "grid"} fixed inset-x-0 bottom-0 z-20 grid-cols-3 gap-2 border-t border-slate-800 bg-slate-900/95 p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden`}>
         <button
           onClick={controls.long}
           disabled={!canTrade}
