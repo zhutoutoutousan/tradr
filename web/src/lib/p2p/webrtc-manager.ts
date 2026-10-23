@@ -17,6 +17,75 @@ export interface PeerMessage {
   timestamp: number;
 }
 
+export interface CandidateSummary {
+  total: number;
+  ipv4: number;
+  ipv6: number;
+  mdns: number;
+  srflx: number;
+  relay: number;
+}
+
+export interface ConnectionDiagnostics {
+  local: CandidateSummary;
+  remote: CandidateSummary;
+  iceState: string;
+  connectionState: string;
+  gatheringState: string;
+}
+
+export function summarizeCandidates(sdp: string): CandidateSummary {
+  const out: CandidateSummary = { total: 0, ipv4: 0, ipv6: 0, mdns: 0, srflx: 0, relay: 0 };
+  for (const [, line] of sdp.matchAll(/^a=candidate:(.*)$/gm)) {
+    const parts = line.trim().split(/\s+/);
+    const address = parts[4] ?? '';
+    const type = parts[7];
+    out.total++;
+    if (type === 'srflx') out.srflx++;
+    else if (type === 'relay') out.relay++;
+    if (address.endsWith('.local')) out.mdns++;
+    else if (address.includes(':')) out.ipv6++;
+    else out.ipv4++;
+  }
+  return out;
+}
+
+export function describeSummary(s: CandidateSummary): string {
+  if (s.total === 0) return 'keine Netzwerkadressen';
+  const parts = [];
+  if (s.ipv4) parts.push(`${s.ipv4}× IPv4`);
+  if (s.ipv6) parts.push(`${s.ipv6}× IPv6`);
+  if (s.mdns) parts.push(`${s.mdns}× .local`);
+  if (s.srflx) parts.push(`${s.srflx}× öffentlich`);
+  return parts.join(', ');
+}
+
+const RTC_CONFIG: RTCConfiguration = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ],
+};
+
+/**
+ * Browsers hide LAN addresses behind random "<uuid>.local" mDNS names unless
+ * the page has camera/mic access. Those names often can't be resolved between
+ * devices (Windows firewalls, iOS <-> Chrome, client-isolated Wi-Fi), so ask for
+ * the camera (needed for QR scanning anyway) before gathering candidates; then
+ * the QR carries real LAN IPs.
+ */
+export async function unlockLanAddresses(): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return false;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    stream.getTracks().forEach((t) => t.stop());
+    return true;
+  } catch (err) {
+    console.warn('[WebRTC] Camera not granted, LAN addresses stay hidden (mDNS):', err);
+    return false;
+  }
+}
+
 export interface PeerInfo {
   id: string;
   role: PeerRole;
@@ -32,27 +101,18 @@ class WebRTCManager {
   private onMessageCallbacks: Set<(message: PeerMessage) => void> = new Set();
   private onStateChangeCallbacks: Set<(state: ConnectionState) => void> = new Set();
   private connectionState: ConnectionState = 'disconnected';
+  private remoteSdp = '';
 
   constructor() {
     if (typeof window === 'undefined') return;
   }
 
   async createOffer(username: string): Promise<string> {
+    this.disconnect();
     this.role = 'host';
-    this.localInfo = {
-      id: randomId(),
-      role: 'host',
-      username
-    };
-
-    const configuration: RTCConfiguration = {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-      ]
-    };
-
-    this.peerConnection = new RTCPeerConnection(configuration);
+    this.localInfo = { id: randomId(), role: 'host', username };
+    await unlockLanAddresses();
+    this.peerConnection = new RTCPeerConnection(RTC_CONFIG);
     this.setupPeerConnection();
 
     this.dataChannel = this.peerConnection.createDataChannel('game', {
@@ -65,28 +125,21 @@ class WebRTCManager {
 
     await this.waitForICEGathering();
 
+    console.log('[WebRTC] Local candidates:', describeSummary(summarizeCandidates(this.peerConnection.localDescription!.sdp)));
     return encodeSignal(this.peerConnection.localDescription!, username);
   }
 
   async acceptOffer(offerString: string, username: string): Promise<string> {
-    this.role = 'guest';
-    this.localInfo = {
-      id: randomId(),
-      role: 'guest',
-      username
-    };
-
     const offerData = decodeSignal(offerString);
+    this.disconnect();
+    this.role = 'guest';
+    this.localInfo = { id: randomId(), role: 'guest', username };
     this.remoteInfo = { id: randomId(), role: 'host', username: offerData.username };
+    this.remoteSdp = offerData.description.sdp ?? '';
+    console.log('[WebRTC] Offer candidates:', describeSummary(summarizeCandidates(this.remoteSdp)));
 
-    const configuration: RTCConfiguration = {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-      ]
-    };
-
-    this.peerConnection = new RTCPeerConnection(configuration);
+    await unlockLanAddresses();
+    this.peerConnection = new RTCPeerConnection(RTC_CONFIG);
     this.setupPeerConnection();
 
     await this.peerConnection.setRemoteDescription(
@@ -98,6 +151,7 @@ class WebRTCManager {
 
     await this.waitForICEGathering();
 
+    console.log('[WebRTC] Local candidates:', describeSummary(summarizeCandidates(this.peerConnection.localDescription!.sdp)));
     return encodeSignal(this.peerConnection.localDescription!, username);
   }
 
@@ -108,6 +162,8 @@ class WebRTCManager {
 
     const answerData = decodeSignal(answerString);
     this.remoteInfo = { id: randomId(), role: 'guest', username: answerData.username };
+    this.remoteSdp = answerData.description.sdp ?? '';
+    console.log('[WebRTC] Answer candidates:', describeSummary(summarizeCandidates(this.remoteSdp)));
 
     await this.peerConnection.setRemoteDescription(
       new RTCSessionDescription(answerData.description)
@@ -115,45 +171,57 @@ class WebRTCManager {
   }
 
   private setupPeerConnection() {
-    if (!this.peerConnection) return;
+    const pc = this.peerConnection;
+    if (!pc) return;
 
-    this.peerConnection.oniceconnectionstatechange = () => {
-      const state = this.peerConnection?.iceConnectionState;
+    pc.oniceconnectionstatechange = () => {
+      if (this.peerConnection !== pc) return;
+      const state = pc.iceConnectionState;
       console.log('[WebRTC] ICE connection state:', state);
 
       // ICE can reach "connected" on the guest before the host has even scanned
       // the answer (the host replies to connectivity checks), so "connected" is
       // only reported once the data channel opens.
-      if (state === 'failed' || state === 'disconnected') {
+      // "disconnected" is often transient (ICE recovers on its own), only "failed" is final.
+      if (state === 'failed') {
         this.setConnectionState('failed');
       } else if (state === 'checking') {
         this.setConnectionState('connecting');
       }
     };
 
-    this.peerConnection.ondatachannel = (event) => {
+    pc.onicecandidateerror = (event) => {
+      const e = event as RTCPeerConnectionIceErrorEvent;
+      if (e.errorCode !== 701) console.warn('[WebRTC] ICE candidate error:', e.errorCode, e.errorText);
+    };
+
+    pc.ondatachannel = (event) => {
+      if (this.peerConnection !== pc) return;
       console.log('[WebRTC] Data channel received');
       this.dataChannel = event.channel;
       this.setupDataChannel(this.dataChannel);
     };
 
-    this.peerConnection.onconnectionstatechange = () => {
-      console.log('[WebRTC] Connection state:', this.peerConnection?.connectionState);
+    pc.onconnectionstatechange = () => {
+      console.log('[WebRTC] Connection state:', pc.connectionState);
     };
   }
 
   private setupDataChannel(channel: RTCDataChannel) {
     channel.onopen = () => {
+      if (this.dataChannel !== channel) return;
       console.log('[WebRTC] Data channel open');
       this.setConnectionState('connected');
     };
 
     channel.onclose = () => {
+      if (this.dataChannel !== channel) return;
       console.log('[WebRTC] Data channel closed');
       this.setConnectionState('disconnected');
     };
 
     channel.onerror = (error) => {
+      if (this.dataChannel !== channel) return;
       console.error('[WebRTC] Data channel error:', error);
       this.setConnectionState('failed');
     };
@@ -231,6 +299,17 @@ class WebRTCManager {
     this.onStateChangeCallbacks.forEach(callback => callback(state));
   }
 
+  getDiagnostics(): ConnectionDiagnostics {
+    const pc = this.peerConnection;
+    return {
+      local: summarizeCandidates(pc?.localDescription?.sdp ?? ''),
+      remote: summarizeCandidates(this.remoteSdp),
+      iceState: pc?.iceConnectionState ?? 'none',
+      connectionState: pc?.connectionState ?? 'none',
+      gatheringState: pc?.iceGatheringState ?? 'none',
+    };
+  }
+
   disconnect() {
     if (this.dataChannel) {
       this.dataChannel.close();
@@ -246,6 +325,7 @@ class WebRTCManager {
     this.role = null;
     this.localInfo = null;
     this.remoteInfo = null;
+    this.remoteSdp = '';
   }
 
   getLocalInfo(): PeerInfo | null {

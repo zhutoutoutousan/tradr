@@ -4,7 +4,10 @@ import { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import QrCameraView from '@/components/QrCameraView';
 import { webrtcManager } from '@/lib/p2p/webrtc-manager';
-import type { ConnectionState } from '@/lib/p2p/webrtc-manager';
+import type { ConnectionDiagnostics, ConnectionState } from '@/lib/p2p/webrtc-manager';
+import { ConnectionTrouble, reportConnectionTrouble } from './ConnectionTrouble';
+
+const SLOW_HINT_MS = 45_000;
 
 interface LocalMultiplayerJoinProps {
   username: string;
@@ -22,10 +25,28 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
   const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
   const [shouldStartScanner, setShouldStartScanner] = useState(false);
   const scanHandledRef = useRef(false);
+  const [trouble, setTrouble] = useState<ConnectionDiagnostics | null>(null);
+  const [slow, setSlow] = useState(false);
+  const answerShownRef = useRef(false);
+
+  useEffect(() => {
+    answerShownRef.current = Boolean(answerCode);
+    if (!answerCode) return;
+    const timer = window.setTimeout(() => {
+      if (!webrtcManager.isConnected()) {
+        reportConnectionTrouble('guest', 'slow');
+        setSlow(true);
+      }
+    }, SLOW_HINT_MS);
+    return () => window.clearTimeout(timer);
+  }, [answerCode]);
 
   useEffect(() => {
     const unsubscribe = webrtcManager.onStateChange((state) => {
       setConnectionState(state);
+      if (state === 'failed' && answerShownRef.current) {
+        setTrouble(reportConnectionTrouble('guest', 'ice-failed'));
+      }
       if (state === 'connected') {
         const remoteInfo = webrtcManager.getRemoteInfo();
         if (remoteInfo) {
@@ -38,6 +59,19 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
       unsubscribe();
     };
   }, [onConnected]);
+
+  const retry = () => {
+    webrtcManager.disconnect();
+    scanHandledRef.current = false;
+    answerShownRef.current = false;
+    setTrouble(null);
+    setSlow(false);
+    setAnswerCode('');
+    setOfferInput('');
+    setLoading(false);
+    setError('');
+    setShouldStartScanner(false);
+  };
 
   const handleCameraError = (err: unknown) => {
     console.error('[LocalMP Join] Camera failed:', err);
@@ -114,6 +148,10 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
     }
   };
 
+  if (trouble) {
+    return <ConnectionTrouble diagnostics={trouble} onRetry={retry} onCancel={onCancel} />;
+  }
+
   if (connectionState === 'connecting' && !answerCode) {
     return (
       <div className="flex flex-col items-center justify-center p-8">
@@ -135,7 +173,7 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
         </p>
 
         {/* Answer QR Code - Main Feature for Airplane Mode */}
-        <div className="bg-white p-6 rounded-lg mb-6 shadow-lg">
+        <div className="bg-white p-6 rounded-lg mb-6 shadow-lg" data-testid="local-mp-answer" data-code={answerCode}>
           <QRCodeSVG
             value={answerCode}
             size={288}
@@ -186,6 +224,18 @@ export function LocalMultiplayerJoin({ username, onConnected, onCancel }: LocalM
           <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
           <span className="text-sm text-slate-300">Warte auf Host...</span>
         </div>
+
+        {slow && (
+          <div className="mt-4 w-full max-w-md rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200" data-testid="local-mp-slow">
+            Hat der Host deinen Code schon gescannt und es passiert nichts? Dann finden sich die Geräte im Netzwerk nicht.
+            <button
+              onClick={() => setTrouble(webrtcManager.getDiagnostics())}
+              className="mt-2 block w-full rounded-lg bg-amber-500/20 py-2 font-semibold text-amber-100 hover:bg-amber-500/30"
+            >
+              Hilfe & neu versuchen
+            </button>
+          </div>
+        )}
 
         <button
           onClick={onCancel}

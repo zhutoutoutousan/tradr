@@ -4,7 +4,10 @@ import { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import QrCameraView from '@/components/QrCameraView';
 import { webrtcManager } from '@/lib/p2p/webrtc-manager';
-import type { ConnectionState } from '@/lib/p2p/webrtc-manager';
+import type { ConnectionDiagnostics, ConnectionState } from '@/lib/p2p/webrtc-manager';
+import { ConnectionTrouble, reportConnectionTrouble } from './ConnectionTrouble';
+
+const CONNECT_TIMEOUT_MS = 20_000;
 
 interface LocalMultiplayerHostProps {
   username: string;
@@ -23,6 +26,18 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
   const [manualMode, setManualMode] = useState(false);
   const [shouldStartAnswerScanner, setShouldStartAnswerScanner] = useState(false);
   const scanHandledRef = useRef(false);
+  const [attempt, setAttempt] = useState(0);
+  const [trouble, setTrouble] = useState<ConnectionDiagnostics | null>(null);
+  const answerSubmittedRef = useRef(false);
+
+  useEffect(() => {
+    answerSubmittedRef.current = answerSubmitted;
+    if (!answerSubmitted) return;
+    const timer = window.setTimeout(() => {
+      if (!webrtcManager.isConnected()) setTrouble(reportConnectionTrouble('host', 'timeout'));
+    }, CONNECT_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [answerSubmitted, attempt]);
 
   useEffect(() => {
     async function createOffer() {
@@ -43,6 +58,9 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
 
     const unsubscribe = webrtcManager.onStateChange((state) => {
       setConnectionState(state);
+      if (state === 'failed' && answerSubmittedRef.current) {
+        setTrouble(reportConnectionTrouble('host', 'ice-failed'));
+      }
       if (state === 'connected') {
         const remoteInfo = webrtcManager.getRemoteInfo();
         if (remoteInfo) {
@@ -54,7 +72,22 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
     return () => {
       unsubscribe();
     };
-  }, [username, onConnected]);
+  }, [username, onConnected, attempt]);
+
+  const retry = () => {
+    webrtcManager.disconnect();
+    scanHandledRef.current = false;
+    answerSubmittedRef.current = false;
+    setTrouble(null);
+    setAnswerSubmitted(false);
+    setAnswerInput('');
+    setShouldStartAnswerScanner(false);
+    setWaitingForAnswer(false);
+    setOfferCode('');
+    setError('');
+    setLoading(true);
+    setAttempt((a) => a + 1);
+  };
 
   const handleCameraError = (err: unknown) => {
     console.error('[LocalMP Host] Camera failed:', err);
@@ -125,8 +158,15 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
       <div className="flex flex-col items-center justify-center p-8">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mb-4" />
         <p className="text-slate-400">Erstelle Spiel...</p>
+        <p className="mt-2 max-w-xs text-center text-xs text-slate-500">
+          Bitte Kamera-Zugriff erlauben – damit finden sich die Geräte direkt im WLAN und du kannst später den Antwort-Code scannen.
+        </p>
       </div>
     );
+  }
+
+  if (trouble) {
+    return <ConnectionTrouble diagnostics={trouble} onRetry={retry} onCancel={onCancel} />;
   }
 
   if (error) {
@@ -143,12 +183,15 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
     );
   }
 
-  if (connectionState === 'connecting' && answerSubmitted) {
+  if (answerSubmitted && connectionState !== 'connected') {
     return (
-      <div className="flex flex-col items-center justify-center p-8">
+      <div className="flex flex-col items-center justify-center p-8" data-testid="local-mp-connecting">
         <div className="animate-pulse text-4xl mb-4">🔗</div>
         <p className="text-lg font-semibold text-white mb-2">Verbindung wird hergestellt...</p>
         <p className="text-sm text-slate-400">Dies kann einige Sekunden dauern</p>
+        <button onClick={retry} className="mt-6 text-sm text-slate-400 hover:text-white">
+          🔄 Abbrechen und neu versuchen
+        </button>
       </div>
     );
   }
@@ -179,7 +222,7 @@ export function LocalMultiplayerHost({ username, onConnected, onCancel }: LocalM
       </p>
 
       {/* QR Code */}
-      <div className="bg-white p-6 rounded-lg mb-6 shadow-lg">
+      <div className="bg-white p-6 rounded-lg mb-6 shadow-lg" data-testid="local-mp-offer" data-code={offerCode}>
         <QRCodeSVG
           value={offerCode}
           size={288}

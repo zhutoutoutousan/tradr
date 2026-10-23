@@ -17,8 +17,7 @@ function makeCameraVideo(png, out) {
 }
 
 async function launch(video) {
-  const args = ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream',
-    '--disable-features=WebRtcHideLocalIpsWithMdns'];
+  const args = ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'];
   if (video) args.push(`--use-file-for-fake-video-capture=${video}`);
   const browser = await chromium.launch({ args });
   const context = await browser.newContext({ permissions: ['camera'], serviceWorkers: 'block', viewport: { width: 420, height: 900 } });
