@@ -19,6 +19,12 @@ export default function CommunityPage() {
               Play
             </Link>
             <Link
+              href="/bots"
+              className="rounded-lg border border-fuchsia-500/40 px-3 py-1.5 text-sm text-fuchsia-300 hover:bg-fuchsia-500/10"
+            >
+              Bot Factory
+            </Link>
+            <Link
               href="/multiplayer"
               className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
             >
