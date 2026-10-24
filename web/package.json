@@ -22,7 +22,8 @@
     "demo:full": "playwright test e2e/sharp-demo.spec.ts --project=sharp-desktop -g \"complete journey\"",
     "demo:flows": "node scripts/gen-e2e.mjs && playwright test e2e/user-flow-demos.spec.ts --project=flow-desktop && node scripts/collect-demos.mjs",
     "demo:full-solo": "node scripts/gen-e2e.mjs && playwright test e2e/full-solo-demo.spec.ts --project=full-solo-desktop && node scripts/collect-demos.mjs",
-    "demo:full-solo:mobile": "node scripts/gen-e2e.mjs && playwright test e2e/full-solo-demo.spec.ts --project=full-solo-mobile && node scripts/collect-demos.mjs"
+    "demo:full-solo:mobile": "node scripts/gen-e2e.mjs && playwright test e2e/full-solo-demo.spec.ts --project=full-solo-mobile && node scripts/collect-demos.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@sentry/nextjs": "^11.9.0",
@@ -46,6 +47,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }
