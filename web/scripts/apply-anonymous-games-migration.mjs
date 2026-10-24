@@ -7,8 +7,10 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sql = readFileSync(join(root, "supabase/migrations/001_anonymous_games.sql"), "utf8");
 
 async function main() {
-  const password = process.env.POSTGRES_PASSWORD;
-  if (!password) throw new Error("POSTGRES_PASSWORD is not set");
+  // Project-prefixed Cloud Secret (not POSTGRES_PASSWORD) so it does not collide
+  // with other repos/environments that also inject a generic Postgres password.
+  const password = process.env.TRADR_SUPABASE_DB_KEY;
+  if (!password) throw new Error("TRADR_SUPABASE_DB_KEY is not set");
   const client = new pg.Client({
     host: "aws-1-us-east-1.pooler.supabase.com",
     port: 6543,
