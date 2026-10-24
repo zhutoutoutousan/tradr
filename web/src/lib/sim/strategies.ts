@@ -92,6 +92,8 @@ export function makeRsiScalping(p: Record<string, number> = {}): OnBar {
       return null;
     }
 
+    // A trade closed by its stop leaves the counter behind; start each trade fresh.
+    state.against = 0;
     if (twoAgo <= oversold && prev > oversold) {
       return { open: { side: "long", slPct, tpPct } };
     }
