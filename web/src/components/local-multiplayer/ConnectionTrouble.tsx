@@ -8,20 +8,33 @@ import {
   type PeerRole,
 } from "@/lib/p2p/webrtc-manager";
 
+/** Soft UX hints (e.g. "still connecting…") — breadcrumb only. Hard failures go to Sentry. */
+const SENTRY_REASONS = new Set(["timeout", "ice-failed"]);
+
 export function reportConnectionTrouble(role: PeerRole, reason: string): ConnectionDiagnostics {
   const diag = webrtcManager.getDiagnostics();
   console.warn(`[LocalMP] ${role} connection trouble (${reason})`, diag);
-  Sentry.captureMessage(`local-mp: ${reason}`, {
-    level: "warning",
-    tags: {
-      local_mp_role: role,
-      local_mp_reason: reason,
-      local_mp_ice: diag.iceState,
-      local_mp_local_mdns_only: String(diag.local.total > 0 && diag.local.mdns === diag.local.total),
-      local_mp_remote_mdns_only: String(diag.remote.total > 0 && diag.remote.mdns === diag.remote.total),
-    },
-    extra: { ...diag },
-  });
+  const tags = {
+    local_mp_role: role,
+    local_mp_reason: reason,
+    local_mp_ice: diag.iceState,
+    local_mp_local_mdns_only: String(diag.local.total > 0 && diag.local.mdns === diag.local.total),
+    local_mp_remote_mdns_only: String(diag.remote.total > 0 && diag.remote.mdns === diag.remote.total),
+  };
+  if (SENTRY_REASONS.has(reason)) {
+    Sentry.captureMessage(`local-mp: ${reason}`, {
+      level: "warning",
+      tags,
+      extra: { ...diag },
+    });
+  } else {
+    Sentry.addBreadcrumb({
+      category: "local-mp",
+      message: `${role}: ${reason}`,
+      level: "warning",
+      data: { ...tags, ...diag },
+    });
+  }
   return diag;
 }
 
