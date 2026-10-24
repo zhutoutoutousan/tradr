@@ -183,6 +183,15 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
             v3.12.4-host-sync
           </span>
         </p>
+        <p className="mt-2">
+          <Link
+            href="/bots"
+            data-testid="mode-bots"
+            className="text-xs font-semibold text-fuchsia-400 hover:text-fuchsia-300"
+          >
+            Bot Factory → build & backtest (login required)
+          </Link>
+        </p>
       </div>
     </div>
   );

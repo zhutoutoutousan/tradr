@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { authService } from "@/lib/auth/supabase-auth";
+import { safeNextPath, stashAuthNext } from "@/lib/bots/authRedirect";
 
-export default function RegisterPage() {
+function RegisterPageInner() {
+  const searchParams = useSearchParams();
+  const nextPath = safeNextPath(searchParams.get("next"), "/play");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
@@ -18,6 +22,7 @@ export default function RegisterPage() {
     setError(null);
     
     try {
+      stashAuthNext(nextPath);
       const { error } = await authService.signInWithOAuth(provider);
       if (error) throw new Error(error.message);
       // OAuth will redirect, no need to set success message
@@ -43,7 +48,7 @@ export default function RegisterPage() {
         if (error) throw new Error(error.message);
         setSuccess("Login successful! Redirecting...");
         setTimeout(() => {
-          window.location.href = "/play";
+          window.location.href = nextPath;
         }, 1000);
       } else {
         // Register
@@ -64,7 +69,7 @@ export default function RegisterPage() {
         } else if (user && session) {
           setSuccess("Registration successful! Redirecting...");
           setTimeout(() => {
-            window.location.href = "/play";
+            window.location.href = nextPath;
           }, 1000);
         }
       }
@@ -236,5 +241,17 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">Loading…</div>
+      }
+    >
+      <RegisterPageInner />
+    </Suspense>
   );
 }
