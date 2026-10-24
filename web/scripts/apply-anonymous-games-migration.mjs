@@ -7,11 +7,13 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sql = readFileSync(join(root, "supabase/migrations/001_anonymous_games.sql"), "utf8");
 
 async function main() {
+  const password = process.env.POSTGRES_PASSWORD;
+  if (!password) throw new Error("POSTGRES_PASSWORD is not set");
   const client = new pg.Client({
     host: "aws-1-us-east-1.pooler.supabase.com",
     port: 6543,
     user: "postgres.bcwxvyomuoolrolspgzn",
-    password: process.env.POSTGRES_PASSWORD ?? "zQ1wS3REUm1kvJxn",
+    password,
     database: "postgres",
     ssl: { rejectUnauthorized: false },
   });
