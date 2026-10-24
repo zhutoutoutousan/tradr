@@ -40,7 +40,7 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
     <div
       className={
         isMobile
-          ? "grid min-h-[100dvh] w-full grid-rows-[repeat(5,1fr)_auto] bg-slate-950 text-slate-100"
+          ? "grid min-h-[100dvh] w-full grid-rows-[repeat(6,1fr)_auto] bg-slate-950 text-slate-100"
           : "grid min-h-[100dvh] w-full grid-cols-3 grid-rows-[1fr_1fr_auto] bg-slate-950 text-slate-100"
       }
     >
@@ -110,7 +110,7 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
         data-testid="mode-local-multiplayer"
         onClick={() => onPick("local-multiplayer")}
         className={`group flex flex-col items-center justify-center gap-4 p-6 text-center transition active:bg-slate-900 sm:p-8 ${
-          isMobile ? "border-b border-slate-800" : "border-r border-slate-800"
+          isMobile ? "border-b border-slate-800" : "border-r border-b border-slate-800"
         }`}
       >
         <div className="text-5xl">✈️</div>
@@ -125,12 +125,30 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
         </span>
       </button>
 
-      {/* Login/Register or Profile Card */}
+      <Link
+        href="/bots"
+        data-testid="mode-bots"
+        className={`group flex flex-col items-center justify-center gap-4 p-6 text-center transition hover:bg-slate-900 sm:p-8 ${
+          isMobile ? "border-b border-slate-800" : "border-r border-b border-slate-800"
+        }`}
+      >
+        <div className="text-5xl">🤖</div>
+        <div>
+          <h2 className="text-2xl font-extrabold text-fuchsia-400 sm:text-3xl">Bot Factory</h2>
+          <p className="mx-auto mt-2 max-w-xs text-sm text-slate-400 sm:text-base">
+            Write formulas, backtest on history. Login required.
+          </p>
+        </div>
+        <span className="rounded-full bg-fuchsia-500 px-6 py-3 text-base font-bold text-slate-950 group-hover:bg-fuchsia-400">
+          Open factory
+        </span>
+      </Link>
+
       {user && profile ? (
         <Link
           href="/profile"
           className={`group flex flex-col items-center justify-center gap-4 p-6 text-center transition hover:bg-slate-900 sm:p-8 ${
-            isMobile ? "border-b border-slate-800" : "border-slate-800"
+            isMobile ? "border-b border-slate-800" : "border-b border-slate-800"
           }`}
         >
           <div className="text-5xl">👤</div>
@@ -139,11 +157,13 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
               {profile.display_name || profile.username}
             </h2>
             <p className="mx-auto mt-2 max-w-xs text-sm text-slate-400 sm:text-base">
-              ELO: {profile.elo_rating} · {profile.total_games} Spiele · {((profile.total_wins / Math.max(profile.total_games, 1)) * 100).toFixed(0)}% Siegesrate
+              ELO: {profile.elo_rating} · {profile.total_games} Spiele ·{" "}
+              {((profile.total_wins / Math.max(profile.total_games, 1)) * 100).toFixed(0)}% Siegesrate
             </p>
             <div className="mt-3 flex items-center justify-center gap-4 text-xs text-slate-500">
-              <span className={profile.total_profit >= 0 ? 'text-green-400' : 'text-red-400'}>
-                Gewinn: {profile.total_profit >= 0 ? '+' : ''}{profile.total_profit.toFixed(0)}
+              <span className={profile.total_profit >= 0 ? "text-green-400" : "text-red-400"}>
+                Gewinn: {profile.total_profit >= 0 ? "+" : ""}
+                {profile.total_profit.toFixed(0)}
               </span>
             </div>
           </div>
@@ -155,7 +175,7 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
         <Link
           href="/register"
           className={`group flex flex-col items-center justify-center gap-4 p-6 text-center transition hover:bg-slate-900 sm:p-8 ${
-            isMobile ? "border-b border-slate-800" : "border-slate-800"
+            isMobile ? "border-b border-slate-800" : "border-b border-slate-800"
           }`}
         >
           <div className="text-5xl">🔐</div>
@@ -164,10 +184,8 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
             <p className="mx-auto mt-2 max-w-xs text-sm text-slate-400 sm:text-base">
               Save your progress, track stats & compete on leaderboards.
             </p>
-            <div className="mt-3 rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-2 mx-auto max-w-xs">
-              <p className="text-xs text-amber-300 font-semibold">
-                💎 Early Supporter: Free Forever!
-              </p>
+            <div className="mt-3 mx-auto max-w-xs rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+              <p className="text-xs font-semibold text-amber-300">💎 Early Supporter: Free Forever!</p>
             </div>
           </div>
           <span className="rounded-full bg-rose-500 px-6 py-3 text-base font-bold text-slate-950 group-hover:bg-rose-400">
@@ -179,18 +197,9 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
       <div className="col-span-full px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center">
         <p className="text-xs text-slate-600">
           ◆ Tradr — tap a mode to start
-          <span className="ml-2 rounded-md bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-500/80">
+          <span className="ml-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-500/80">
             v3.12.4-host-sync
           </span>
-        </p>
-        <p className="mt-2">
-          <Link
-            href="/bots"
-            data-testid="mode-bots"
-            className="text-xs font-semibold text-fuchsia-400 hover:text-fuchsia-300"
-          >
-            Bot Factory → build & backtest (login required)
-          </Link>
         </p>
       </div>
     </div>

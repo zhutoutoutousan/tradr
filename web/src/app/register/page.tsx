@@ -1,29 +1,35 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { authService } from "@/lib/auth/supabase-auth";
-import { safeNextPath, stashAuthNext } from "@/lib/bots/authRedirect";
+import { authReturnUrl, peekAuthNext, resolveAuthNext, safeNextPath, stashAuthNext } from "@/lib/bots/authRedirect";
 
 function RegisterPageInner() {
   const searchParams = useSearchParams();
-  const nextPath = safeNextPath(searchParams.get("next"), "/play");
+  const nextFromUrl = searchParams.get("next");
+  const nextPath = safeNextPath(nextFromUrl ?? peekAuthNext(), "/play");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
-  const [isLogin, setIsLogin] = useState(false);
+  const [isLogin, setIsLogin] = useState(Boolean(nextFromUrl));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (nextFromUrl) stashAuthNext(authReturnUrl(safeNextPath(nextFromUrl, "/play")));
+  }, [nextFromUrl]);
 
   async function handleOAuth(provider: 'github' | 'google') {
     setLoading(true);
     setError(null);
     
     try {
-      stashAuthNext(nextPath);
-      const { error } = await authService.signInWithOAuth(provider);
+      const returnTo = authReturnUrl(nextPath);
+      stashAuthNext(returnTo);
+      const { error } = await authService.signInWithOAuth(provider, { next: returnTo });
       if (error) throw new Error(error.message);
       // OAuth will redirect, no need to set success message
     } catch (err) {
@@ -48,7 +54,7 @@ function RegisterPageInner() {
         if (error) throw new Error(error.message);
         setSuccess("Login successful! Redirecting...");
         setTimeout(() => {
-          window.location.href = nextPath;
+          window.location.href = resolveAuthNext(nextFromUrl, nextPath);
         }, 1000);
       } else {
         // Register
@@ -69,7 +75,7 @@ function RegisterPageInner() {
         } else if (user && session) {
           setSuccess("Registration successful! Redirecting...");
           setTimeout(() => {
-            window.location.href = nextPath;
+            window.location.href = resolveAuthNext(nextFromUrl, nextPath);
           }, 1000);
         }
       }

@@ -124,12 +124,20 @@ export default function ProfilePage() {
                 <p className="text-xs text-slate-500 mt-1">{user.email}</p>
               )}
             </div>
-            <Link
-              href="/play"
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-semibold transition-colors"
-            >
-              Spielen
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/bots"
+                className="rounded-lg border border-fuchsia-500/50 bg-fuchsia-500/10 px-4 py-2 font-semibold text-fuchsia-200 transition-colors hover:bg-fuchsia-500/20"
+              >
+                Bot Factory
+              </Link>
+              <Link
+                href="/play"
+                className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold transition-colors hover:bg-emerald-700"
+              >
+                Spielen
+              </Link>
+            </div>
           </div>
 
           <div className="mb-6" data-testid="profile-xp">

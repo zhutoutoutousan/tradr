@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { safeNextPath, stashAuthNext } from "@/lib/bots/authRedirect";
+import { authReturnUrl, safeNextPath, stashAuthNext } from "@/lib/bots/authRedirect";
 
 export default function RequireAuth({ children }: { children: React.ReactNode }) {
   const { loading, isAuthenticated } = useAuth();
@@ -13,9 +13,10 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (loading || isAuthenticated) return;
     const qs = searchParams.toString();
-    const next = safeNextPath(qs ? `${pathname}?${qs}` : pathname, "/bots");
-    stashAuthNext(next);
-    window.location.href = `/register?next=${encodeURIComponent(next)}`;
+    const path = safeNextPath(qs ? `${pathname}?${qs}` : pathname, "/bots");
+    const returnTo = authReturnUrl(path);
+    stashAuthNext(returnTo);
+    window.location.href = `/register?next=${encodeURIComponent(returnTo)}`;
   }, [loading, isAuthenticated, pathname, searchParams]);
 
   if (loading) {

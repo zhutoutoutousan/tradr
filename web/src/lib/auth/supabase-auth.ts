@@ -118,7 +118,10 @@ class AuthService {
     }
   }
 
-  async signInWithOAuth(provider: 'github' | 'google'): Promise<AuthResult> {
+  async signInWithOAuth(
+    provider: 'github' | 'google',
+    opts?: { next?: string },
+  ): Promise<AuthResult> {
     if (!supabase) {
       return {
         user: null,
@@ -128,11 +131,19 @@ class AuthService {
     }
 
     try {
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      // Put the full return URL in ?next= so it survives if Supabase sends the
+      // browser to the Site URL (production) instead of this preview origin.
+      const next = opts?.next
+        ? encodeURIComponent(opts.next.startsWith('http') ? opts.next : `${origin}${opts.next.startsWith('/') ? opts.next : `/${opts.next}`}`)
+        : '';
+      const redirectTo = next
+        ? `${origin}/auth/callback?next=${next}`
+        : `${origin}/auth/callback`;
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
-        options: {
-          redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`
-        }
+        options: { redirectTo },
       });
 
       if (error) return { user: null, session: null, error };

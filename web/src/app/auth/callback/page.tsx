@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { authService } from '@/lib/auth/supabase-auth';
-import { takeAuthNext } from '@/lib/bots/authRedirect';
+import { resolveAuthNext } from '@/lib/bots/authRedirect';
 
 function AuthCallbackContent() {
   const router = useRouter();
@@ -89,8 +89,8 @@ function AuthCallbackContent() {
         console.log('[Auth Callback] Waiting 500ms before redirect...');
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        // Force full page reload to ensure Supabase client picks up the new session
-        const next = takeAuthNext('/play');
+        // Prefer ?next= (survives OAuth landing on production Site URL from a preview).
+        const next = resolveAuthNext(searchParams.get('next'), '/play');
         console.log('[Auth Callback] ✅ Success! Redirecting to', next);
         window.location.href = next;
         
