@@ -15,10 +15,16 @@ const nextConfig: NextConfig = {
   },
 };
 
+// Vercel / docs use SENTRY_AUTH_TOKEN; Cloud Secrets currently store the
+// Organization Auth Token as SENTRY_ORG_TOKEN. Accept either so source map
+// upload is not silently disabled when only one name is set.
+const sentryAuthToken =
+  process.env.SENTRY_AUTH_TOKEN || process.env.SENTRY_ORG_TOKEN;
+
 export default withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
-  authToken: process.env.SENTRY_AUTH_TOKEN,
+  authToken: sentryAuthToken,
   silent: !process.env.CI,
-  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+  sourcemaps: { disable: !sentryAuthToken },
 });
