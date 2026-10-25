@@ -24,9 +24,26 @@ import { saveReplay } from "@/lib/replay/storage";
 import type { ReplayRecording } from "@/lib/replay/types";
 import { saveAccountGame, type AccountGameResult } from "@/lib/game/accountHistory";
 
+export interface ChallengeRoundOpts {
+  levelId: string;
+  botCount: number;
+  durationMs: number;
+  /** 0..1 field toughness override for generateBots */
+  difficulty: number;
+}
+
 export type GameConfig =
-  | { kind: "synthetic"; seed: number; setup: RoundSetup; ghost?: GhostBotSpec }
-  | { kind: "historical"; id: string; label: string; candles: Candle[]; seed: number; setup: RoundSetup; ghost?: GhostBotSpec };
+  | { kind: "synthetic"; seed: number; setup: RoundSetup; ghost?: GhostBotSpec; challenge?: ChallengeRoundOpts }
+  | {
+      kind: "historical";
+      id: string;
+      label: string;
+      candles: Candle[];
+      seed: number;
+      setup: RoundSetup;
+      ghost?: GhostBotSpec;
+      challenge?: ChallengeRoundOpts;
+    };
 
 export interface TraderView {
   id: string;
@@ -129,8 +146,10 @@ function barDate(candles: Candle[], bar: number): string | undefined {
 
 function buildEngine(config: GameConfig): GameEngine {
   const playerElo = loadProfile().elo;
-  const botCount = config.ghost ? 5 : 6;
-  const bots = generateBots(config.seed, playerElo, botCount);
+  const botCount = config.challenge?.botCount ?? (config.ghost ? 5 : 6);
+  const bots = generateBots(config.seed, playerElo, botCount, {
+    difficulty: config.challenge?.difficulty,
+  });
   const tpb = config.setup.ticksPerBar;
   const ghost = config.ghost;
   if (config.kind === "synthetic") {
@@ -178,7 +197,7 @@ export function useGame(config: GameConfig, markets: MarketOption[] = []) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [running, setRunning] = useState(true);
   const [speedIdx, setSpeedIdx] = useState(0);
-  const roundMsRef = useRef(readRoundMs());
+  const roundMsRef = useRef(config.challenge?.durationMs ?? readRoundMs());
   const [timeLeftMs, setTimeLeftMs] = useState(roundMsRef.current);
   const [gameOver, setGameOver] = useState(false);
   const [result, setResult] = useState<RoundResult | null>(null);

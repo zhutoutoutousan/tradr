@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const NAV: { href: string; label: string; exact?: boolean }[] = [
   { href: "/bots", label: "My bots", exact: true },
   { href: "/bots/lab", label: "Lab" },
+  { href: "/academy", label: "Academy" },
 ];
 
 export default function BotsShell({

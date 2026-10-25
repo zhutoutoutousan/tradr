@@ -126,6 +126,12 @@ export default function ProfilePage() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Link
+                href="/academy"
+                className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-2 font-semibold text-amber-200 transition-colors hover:bg-amber-500/20"
+              >
+                Academy
+              </Link>
+              <Link
                 href="/bots"
                 className="rounded-lg border border-fuchsia-500/50 bg-fuchsia-500/10 px-4 py-2 font-semibold text-fuchsia-200 transition-colors hover:bg-fuchsia-500/20"
               >

@@ -65,25 +65,24 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
         </span>
       </button>
 
-      <button
-        type="button"
+      <Link
+        href="/academy"
         data-testid="mode-challenge"
-        onClick={() => onPick("challenge")}
-        className={`group flex flex-col items-center justify-center gap-4 p-6 text-center transition active:bg-slate-900 sm:p-8 ${
+        className={`group flex flex-col items-center justify-center gap-4 p-6 text-center transition hover:bg-slate-900 sm:p-8 ${
           isMobile ? "border-b border-slate-800" : "border-r border-b border-slate-800"
         }`}
       >
-        <div className="text-5xl">🏆</div>
+        <div className="text-5xl">🎓</div>
         <div>
-          <h2 className="text-2xl font-extrabold text-amber-400 sm:text-3xl">Challenge Mode</h2>
+          <h2 className="text-2xl font-extrabold text-amber-400 sm:text-3xl">Tradr Academy</h2>
           <p className="mx-auto mt-2 max-w-xs text-sm text-slate-400 sm:text-base">
-            Story & Challenge levels. Unlock powerups & achievements!
+            Quant + AI-agent lessons, Story campaign, Bot Lab drills. Login required.
           </p>
         </div>
         <span className="rounded-full bg-amber-500 px-6 py-3 text-base font-bold text-slate-950 group-hover:bg-amber-400">
-          Play Levels
+          Enter Academy
         </span>
-      </button>
+      </Link>
 
       <button
         type="button"

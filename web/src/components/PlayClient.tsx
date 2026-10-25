@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import GameView, { type MarketOption } from "@/components/GameView";
 import TutorialModal from "@/components/TutorialModal";
 import LandingIntro from "@/components/LandingIntro";
@@ -10,11 +11,14 @@ import { LocalMultiplayerMenu } from "@/components/local-multiplayer/LocalMultip
 import { LocalMultiplayerGame } from "@/components/local-multiplayer/LocalMultiplayerGame";
 import { webrtcManager } from "@/lib/p2p/webrtc-manager";
 import SuggestRegisterModal from "@/components/SuggestRegisterModal";
-import type { GameConfig, RoundResult } from "@/hooks/useGame";
+import type { ChallengeRoundOpts, GameConfig, RoundResult } from "@/hooks/useGame";
 import type { Candle } from "@/lib/sim/types";
 import { pickRoundSetup, type RoundSetup } from "@/lib/game/roundSetup";
 import { saveAnonymousGame } from "@/lib/game/anonymousGames";
 import { authService } from "@/lib/auth/supabase-auth";
+import { getChallengeById, calculateStars } from "@/lib/game/challenges";
+import { completeChallengeLevel, loadProgress } from "@/lib/game/progress";
+import { peekChallenge, stashChallenge, takeChallenge, type PendingChallenge } from "@/lib/academy";
 
 const TUTORIAL_KEY = "tradr.tutorial.v1";
 const SUGGEST_REGISTER_KEY = "tradr.suggest-register-shown";
@@ -32,7 +36,8 @@ function newSeed() {
   return Math.floor(Math.random() * 1_000_000_000);
 }
 
-export default function PlayClient() {
+function PlayClientInner() {
+  const searchParams = useSearchParams();
   const [ready, setReady] = useState(false);
   const [phase, setPhase] = useState<Phase>("boot");
   const [gameMode, setGameMode] = useState<GameMode | null>(null);
@@ -47,12 +52,30 @@ export default function PlayClient() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [showSuggestRegister, setShowSuggestRegister] = useState(false);
   const [isGuest, setIsGuest] = useState(true);
+  const [pendingChallenge, setPendingChallenge] = useState<PendingChallenge | null>(null);
 
   useEffect(() => {
     setSeed(newSeed());
     setReady(true);
+
+    const levelId = searchParams.get("level");
+    if (levelId) {
+      const level = getChallengeById(levelId);
+      if (level) {
+        const existing = peekChallenge();
+        if (!existing || existing.levelId !== level.id) {
+          stashChallenge(level, existing?.returnTo ?? "/academy/story");
+        }
+        const pending = peekChallenge();
+        setPendingChallenge(pending);
+        setGameMode("solo");
+        setPhase("playing");
+        return;
+      }
+    }
+
     setPhase("mode");
-  }, []);
+  }, [searchParams]);
 
   // Check if user is logged in
   useEffect(() => {
@@ -80,7 +103,7 @@ export default function PlayClient() {
   useEffect(() => {
     if (!ready || gameMode !== "solo") return;
     setSetup(pickRoundSetup(seed, markets));
-  }, [seed, markets, ready, gameMode]);
+  }, [seed, markets, ready, gameMode, pendingChallenge?.levelId]);
 
   useEffect(() => {
     if (!setup || setup.instrumentId === "synthetic") {
@@ -119,12 +142,11 @@ export default function PlayClient() {
     }
     
     if (mode === "challenge") {
-      // Challenge Mode not implemented yet - show message
-      alert("Challenge Mode coming soon! Please select another mode.");
-      setGameMode(null);
+      window.location.href = "/academy";
       return;
     }
-    
+
+    setPendingChallenge(null);
     // Solo and Local Multiplayer: check tutorial
     const seen = localStorage.getItem(TUTORIAL_KEY);
     setPhase(seen ? "playing" : "tutorial");
@@ -150,9 +172,26 @@ export default function PlayClient() {
           console.warn("community save failed", err);
         });
       }
-      
+
+      const challenge = takeChallenge() ?? pendingChallenge;
+      if (challenge) {
+        const level = getChallengeById(challenge.levelId);
+        if (level) {
+          const stars = calculateStars(level, {
+            profit: result.summary.profit,
+            returnPct: result.summary.returnPct,
+            rank: result.rank,
+            trades: result.summary.trades,
+            survivedMs: level.config.durationMs - 0,
+          });
+          const progress = loadProgress();
+          completeChallengeLevel(progress, level.id, stars, level.rewards.xp, level.rewards.unlocks);
+        }
+        setPendingChallenge(null);
+      }
+
       // Show register suggestion for guests (only once)
-      if (isGuest && gameMode === "solo") {
+      if (isGuest && gameMode === "solo" && !challenge) {
         const shown = localStorage.getItem(SUGGEST_REGISTER_KEY);
         if (!shown) {
           // Show after a short delay (let user see the results first)
@@ -163,7 +202,7 @@ export default function PlayClient() {
         }
       }
     },
-    [setup, isGuest, gameMode],
+    [setup, isGuest, gameMode, pendingChallenge],
   );
 
   const handleContinue = useCallback(() => {
@@ -172,16 +211,38 @@ export default function PlayClient() {
 
   const backToMode = useCallback(() => {
     setGameMode(null);
+    setPendingChallenge(null);
     setPhase("mode");
+    if (typeof window !== "undefined" && window.location.search.includes("level=")) {
+      window.history.replaceState({}, "", "/");
+    }
   }, []);
+
+  const challengeOpts: ChallengeRoundOpts | undefined = useMemo(() => {
+    if (!pendingChallenge) return undefined;
+    return {
+      levelId: pendingChallenge.levelId,
+      botCount: pendingChallenge.botCount,
+      durationMs: pendingChallenge.durationMs,
+      difficulty: pendingChallenge.difficulty,
+    };
+  }, [pendingChallenge]);
 
   const config: GameConfig | null = useMemo(() => {
     if (!setup) return null;
-    if (setup.instrumentId === "synthetic") return { kind: "synthetic", seed, setup };
+    if (setup.instrumentId === "synthetic") return { kind: "synthetic", seed, setup, challenge: challengeOpts };
     if (dataset && dataset.id === setup.instrumentId)
-      return { kind: "historical", id: dataset.id, label: dataset.name, candles: dataset.candles, seed, setup };
+      return {
+        kind: "historical",
+        id: dataset.id,
+        label: dataset.name,
+        candles: dataset.candles,
+        seed,
+        setup,
+        challenge: challengeOpts,
+      };
     return null;
-  }, [setup, dataset, seed]);
+  }, [setup, dataset, seed, challengeOpts]);
 
   if (gameMode === "multiplayer") {
     return <MultiplayerJoin onBack={backToMode} />;
@@ -272,11 +333,24 @@ export default function PlayClient() {
         config={config!}
         setup={setup!}
         markets={markets}
+        replayBanner={pendingChallenge ? pendingChallenge.title : undefined}
         onReplay={handleReplay}
         onRoundEnd={handleRoundEnd}
         onContinue={handleContinue}
         onOpenTutorial={() => setShowTutorial(true)}
       />
     </>
+  );
+}
+
+export default function PlayClient() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[100dvh] items-center justify-center bg-slate-950 text-slate-400">Loading…</div>
+      }
+    >
+      <PlayClientInner />
+    </Suspense>
   );
 }
