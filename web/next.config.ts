@@ -13,6 +13,14 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Legacy community gallery URLs → Tradili (backward compatible bookmarks).
+  async redirects() {
+    return [
+      { source: "/community", destination: "/tradili", permanent: false },
+      { source: "/community/:id", destination: "/tradili/:id", permanent: false },
+      { source: "/community/:id/play", destination: "/tradili/:id/play", permanent: false },
+    ];
+  },
 };
 
 // Vercel / docs use SENTRY_AUTH_TOKEN; Cloud Secrets currently store the

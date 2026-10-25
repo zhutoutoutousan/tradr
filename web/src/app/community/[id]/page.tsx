@@ -82,9 +82,9 @@ export default function CommunityMatchPage() {
     return (
       <Shell>
         <div className="rounded-2xl border border-slate-800 bg-slate-900/50 px-6 py-12 text-center">
-          <p className="text-slate-300">This community run could not be found.</p>
-          <Link href="/community" className="mt-4 inline-block text-sm font-semibold text-sky-300 hover:text-sky-200">
-            ← Back to gallery
+          <p className="text-slate-300">This Tradili tape could not be found.</p>
+          <Link href="/tradili" className="mt-4 inline-block text-sm font-semibold text-rose-300 hover:text-rose-200">
+            ← Back to Tradili
           </Link>
         </div>
       </Shell>
@@ -95,13 +95,13 @@ export default function CommunityMatchPage() {
 
   return (
     <Shell>
-      <Link href="/community" className="text-sm font-semibold text-sky-300 hover:text-sky-200">
-        ← Back to gallery
+      <Link href="/tradili" className="text-sm font-semibold text-rose-300 hover:text-rose-200">
+        ← Back to Tradili
       </Link>
 
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-slate-500">Peer match replay</p>
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-rose-400">Tradili tape</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-100">{game.marketLabel}</h1>
           <p className="mt-1 text-sm text-slate-400">
             {formatTimeAgo(game.createdAt)} · #{s.rank} · {game.trades} trades ·{" "}
@@ -122,7 +122,7 @@ export default function CommunityMatchPage() {
         </div>
         <div className="flex gap-2">
           <Link
-            href={`/community/${encodeURIComponent(id)}/play`}
+            href={`/tradili/${encodeURIComponent(id)}/play`}
             data-testid="community-play-along"
             className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold hover:bg-violet-500"
           >
@@ -189,8 +189,8 @@ function Shell({ children }: { children: React.ReactNode }) {
           <Link href="/" className="text-lg font-bold tracking-tight text-emerald-400">
             ◆ Tradr
           </Link>
-          <Link href="/community" className="text-sm text-slate-400 hover:text-slate-200">
-            Gallery
+          <Link href="/tradili" className="text-sm text-slate-400 hover:text-slate-200">
+            Tradili
           </Link>
         </div>
       </header>

@@ -115,7 +115,7 @@ export default function CommunityReplayPlay({ gameId }: { gameId: string }) {
   }, []);
 
   const handleContinue = useCallback(() => {
-    router.push(`/community/${encodeURIComponent(gameId)}`);
+    router.push(`/tradili/${encodeURIComponent(gameId)}`);
   }, [router, gameId]);
 
   if (loading) {
@@ -132,7 +132,7 @@ export default function CommunityReplayPlay({ gameId }: { gameId: string }) {
         <div className="rounded-2xl border border-slate-800 bg-slate-900/50 px-6 py-12 text-center">
           <p className="text-slate-300">{error ?? "This gallery run could not be loaded for replay."}</p>
           <Link
-            href={`/community/${encodeURIComponent(gameId)}`}
+            href={`/tradili/${encodeURIComponent(gameId)}`}
             className="mt-4 inline-block text-sm font-semibold text-sky-300 hover:text-sky-200"
           >
             ← Back to replay
@@ -158,7 +158,7 @@ export default function CommunityReplayPlay({ gameId }: { gameId: string }) {
         {communityReplayBanner(game)} — trade live while the original run replays as{" "}
         <span className="font-semibold text-violet-200">Peer trader</span> alongside the bots.
         <Link
-          href={`/community/${encodeURIComponent(gameId)}`}
+          href={`/tradili/${encodeURIComponent(gameId)}`}
           className="ml-3 font-semibold text-violet-200 underline hover:text-white"
         >
           Watch only
@@ -186,7 +186,7 @@ function Shell({ gameId, children }: { gameId: string; children: React.ReactNode
           <Link href="/" className="text-lg font-bold tracking-tight text-emerald-400">
             ◆ Tradr
           </Link>
-          <Link href={`/community/${encodeURIComponent(gameId)}`} className="text-sm text-slate-400 hover:text-slate-200">
+          <Link href={`/tradili/${encodeURIComponent(gameId)}`} className="text-sm text-slate-400 hover:text-slate-200">
             Back
           </Link>
         </div>

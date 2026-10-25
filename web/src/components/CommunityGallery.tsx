@@ -94,10 +94,11 @@ export default function CommunityGallery() {
     <div>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-slate-500">Peer matches</p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-100 sm:text-3xl">Community gallery</h1>
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-rose-400">Tradili</p>
+          <h1 className="mt-1 text-2xl font-bold text-slate-100 sm:text-3xl">Race tapes & danmaku</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-400">
-            Browse anonymous solo rounds from other traders. Watch their replay or play alongside their recorded trades as a bot.
+            Tradr × Bilibili × YouTube — watch past races with chat, danmaku, MT5 entry→exit lines (players + bots), and
+            sports box scores. Play alongside any tape.
           </p>
         </div>
         <div className="flex gap-1 rounded-lg border border-slate-800 bg-slate-950/60 p-1">
@@ -114,18 +115,18 @@ export default function CommunityGallery() {
       </div>
 
       {loading ? (
-        <p className="text-slate-500">Loading community runs…</p>
+        <p className="text-slate-500">Loading Tradili tapes…</p>
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 px-6 py-12 text-center">
           <p className="text-slate-300">
             {filter === "yours"
               ? "You have not saved any runs yet."
               : filter === "peers"
-                ? "No peer runs yet — be the first after finishing a solo round."
-                : "No community runs yet."}
+                ? "No peer tapes yet — be the first after finishing a solo round."
+                : "No Tradili tapes yet."}
           </p>
           <p className="mt-2 text-sm text-slate-500">
-            Finish a solo round and it is saved anonymously for the gallery.
+            Finish a solo round and it is saved anonymously to Tradili.
           </p>
           <Link
             href="/"
@@ -141,12 +142,12 @@ export default function CommunityGallery() {
               <div
                 key={g.id}
                 data-testid="gallery-card"
-                className="group flex flex-col rounded-xl border border-slate-800 bg-slate-900/50 p-4 transition hover:border-sky-500/40 hover:bg-slate-900"
+                className="group flex flex-col rounded-xl border border-slate-800 bg-slate-900/50 p-4 transition hover:border-rose-500/40 hover:bg-slate-900"
               >
-                <Link href={`/community/${encodeURIComponent(g.id)}`} className="min-w-0 flex-1">
+                <Link href={`/tradili/${encodeURIComponent(g.id)}`} className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h2 className="truncate font-semibold text-slate-100 group-hover:text-sky-200">{g.marketLabel}</h2>
+                      <h2 className="truncate font-semibold text-slate-100 group-hover:text-rose-200">{g.marketLabel}</h2>
                       <p className="mt-0.5 text-xs text-slate-500">
                         {formatTimeAgo(g.createdAt)} · {g.mode}
                       </p>
@@ -175,13 +176,13 @@ export default function CommunityGallery() {
 
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <Link
-                    href={`/community/${encodeURIComponent(g.id)}`}
-                    className="rounded-lg border border-slate-700 px-3 py-2 text-center text-xs font-semibold text-sky-300 hover:bg-slate-800"
+                    href={`/tradili/${encodeURIComponent(g.id)}`}
+                    className="rounded-lg border border-slate-700 px-3 py-2 text-center text-xs font-semibold text-rose-300 hover:bg-slate-800"
                   >
-                    Watch replay
+                    Watch tape
                   </Link>
                   <Link
-                    href={`/community/${encodeURIComponent(g.id)}/play`}
+                    href={`/tradili/${encodeURIComponent(g.id)}/play`}
                     data-testid={`gallery-play-${g.id}`}
                     className="rounded-lg bg-violet-600 px-3 py-2 text-center text-xs font-bold text-white hover:bg-violet-500"
                   >

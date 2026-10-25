@@ -592,7 +592,7 @@ export function MultiplayerGameView({
             {!isSpectator && (
               <p className="mt-3 text-center text-xs text-slate-500">
                 {saveStatus === "saving" && (local ? "Speichere Runde…" : "Saving run to community…")}
-                {saveStatus === "saved" && (local ? "Runde gespeichert." : "Run saved to community gallery.")}
+                {saveStatus === "saved" && (local ? "Runde gespeichert." : "Run saved to Tradili.")}
                 {saveStatus === "error" &&
                   (local ? "Ohne Internet nicht gespeichert." : "Could not save run — check connection and try another round.")}
               </p>
@@ -624,7 +624,7 @@ export function MultiplayerGameView({
                 Leave room
               </button>
               <Link
-                href="/community"
+                href="/tradili"
                 className="flex-1 rounded-lg border border-sky-500/60 bg-sky-500/10 py-3 text-center font-semibold text-sky-300 hover:bg-sky-500/20"
               >
                 Gallery

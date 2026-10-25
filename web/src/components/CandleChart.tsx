@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Candle, Position, Side } from "@/lib/sim/types";
 import { buildOverlays } from "@/lib/game/chartOverlays";
 import type { ChartIndicator } from "@/lib/game/roundSetup";
+import type { DealTrade } from "@/lib/game/reviews";
 
 export interface BotMarker {
   label: string;
@@ -16,6 +17,8 @@ interface Props {
   candles: Candle[];
   position: Position | null;
   botPositions?: BotMarker[];
+  /** Closed deals (MT5-style entry→exit). openBar/closeBar = candle.time */
+  dealOverlays?: DealTrade[];
   indicators?: ChartIndicator[];
   height?: number;
   /** Grow to fill the parent flex area (mobile portrait). */
@@ -37,6 +40,7 @@ export default function CandleChart({
   candles,
   position,
   botPositions = [],
+  dealOverlays = [],
   indicators = [],
   height = 420,
   fill = false,
@@ -115,6 +119,10 @@ export default function CandleChart({
     for (const b of botPositions) {
       hi = Math.max(hi, b.entry);
       lo = Math.min(lo, b.entry);
+    }
+    for (const t of dealOverlays) {
+      hi = Math.max(hi, t.entry, t.exit);
+      lo = Math.min(lo, t.entry, t.exit);
     }
 
     const overlayLines = indicators.length > 0 ? buildOverlays(candles, indicators) : [];
@@ -358,7 +366,50 @@ export default function CandleChart({
       if (position.sl) drawLevel(position.sl, "#f87171", "SL");
       if (position.tp) drawLevel(position.tp, "#4ade80", "TP");
     }
-  }, [candles, position, botPositions, indicators, height, fill, resizeTick]);
+
+    // MT5-style closed deals (player + bots).
+    const xForBar = (bar: number) => {
+      const i = candles.findIndex((c) => c.time === bar);
+      if (i < visStart || i >= visStart + visible.length) return null;
+      return (i - visStart) * slot + candleW / 2 + 2;
+    };
+    for (const t of dealOverlays) {
+      const x1 = xForBar(t.openBar);
+      const x2 = xForBar(t.closeBar);
+      if (x1 == null || x2 == null) continue;
+      const y1 = y(t.entry);
+      const y2 = y(t.exit);
+      const col = t.color ?? (t.pnl >= 0 ? "#4ade80" : "#f87171");
+      ctx.strokeStyle = col;
+      ctx.globalAlpha = t.traderKind === "bot" ? 0.35 : 0.55;
+      ctx.lineWidth = 1.25;
+      ctx.setLineDash(t.traderKind === "bot" ? [3, 3] : [5, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      const mark = (x: number, py: number, entry: boolean) => {
+        const buy = entry ? t.side === "long" : t.side === "short";
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        if (buy) {
+          ctx.moveTo(x, py - 5);
+          ctx.lineTo(x - 4, py + 4);
+          ctx.lineTo(x + 4, py + 4);
+        } else {
+          ctx.moveTo(x, py + 5);
+          ctx.lineTo(x - 4, py - 4);
+          ctx.lineTo(x + 4, py - 4);
+        }
+        ctx.closePath();
+        ctx.fill();
+      };
+      mark(x1, y1, true);
+      mark(x2, y2, false);
+    }
+  }, [candles, position, botPositions, dealOverlays, indicators, height, fill, resizeTick]);
 
   return (
     <div

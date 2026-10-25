@@ -35,14 +35,21 @@ export interface CommunityGameRow {
 /** Rebuild a full RoundReview from stored JSON + list-row stats (older/incomplete saves). */
 export function normalizeCommunityReview(row: CommunityGameRow): RoundReview {
   const r = row.review ?? {};
+  const trades = Array.isArray(r.trades) ? r.trades : [];
+  const allTrades = Array.isArray(r.allTrades) ? r.allTrades : undefined;
   return {
+    v: r.v === 2 || allTrades?.length ? 2 : r.v === 1 ? 1 : undefined,
     id: r.id ?? row.id,
     createdAt: r.createdAt ?? new Date(row.createdAt).getTime(),
     marketId: r.marketId ?? "synthetic",
     marketLabel: r.marketLabel ?? row.marketLabel,
     seed: r.seed ?? 0,
     candles: Array.isArray(r.candles) ? r.candles : [],
-    trades: Array.isArray(r.trades) ? r.trades : [],
+    trades,
+    allTrades,
+    standings: Array.isArray(r.standings) ? r.standings : undefined,
+    chat: Array.isArray(r.chat) ? r.chat : undefined,
+    matchStats: r.matchStats,
     summary: r.summary ?? {
       returnPct: row.returnPct,
       profit: row.profit,

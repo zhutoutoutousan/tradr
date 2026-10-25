@@ -22,7 +22,7 @@ export default function SeoHomeContent() {
             <Link href="/multiplayer">Multiplayer rooms with open room list</Link>
           </li>
           <li>
-            <Link href="/community">Community gallery — watch replays or play alongside</Link>
+            <Link href="/tradili">Tradili — race tapes, danmaku, play alongside</Link>
           </li>
         </ul>
       </nav>
