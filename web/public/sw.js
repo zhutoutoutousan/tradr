@@ -243,6 +243,7 @@ self.addEventListener('fetch', (event) => {
       url.pathname === '/' || 
       url.pathname === '/play' || 
       url.pathname === '/community' ||
+      url.pathname === '/tradili' ||
       url.pathname === '/multiplayer' ||
       url.pathname === '/register') {
     event.respondWith(

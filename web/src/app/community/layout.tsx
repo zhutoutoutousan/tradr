@@ -5,7 +5,7 @@ export const metadata: Metadata = pageMetadata({
   title: "Community Gallery",
   description:
     "Browse anonymous Tradr trading runs. Watch replays or Play alongside—trade the same market while a recorded session replays as a Peer trader bot.",
-  path: "/community",
+  path: "/tradili",
   keywords: [
     "trading replay",
     "trading game gallery",

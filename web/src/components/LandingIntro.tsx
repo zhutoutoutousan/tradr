@@ -88,10 +88,10 @@ export default function LandingIntro({
               Bot Factory
             </Link>
             <Link
-              href="/community"
-              className="rounded-lg border border-sky-500/50 px-3 py-1.5 text-sm font-semibold text-sky-300 hover:bg-sky-500/10"
+              href="/tradili"
+              className="rounded-lg border border-rose-500/50 px-3 py-1.5 text-sm font-semibold text-rose-300 hover:bg-rose-500/10"
             >
-              Community gallery
+              Tradili
             </Link>
             {onTutorial && (
               <button

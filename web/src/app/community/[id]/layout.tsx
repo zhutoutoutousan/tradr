@@ -9,7 +9,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: "Replay",
     description:
       "Watch a Tradr community trading replay or play alongside the same market while the original run replays as a bot.",
-    path: `/community/${encodeURIComponent(id)}`,
+    path: `/tradili/${encodeURIComponent(id)}`,
   });
 }
 

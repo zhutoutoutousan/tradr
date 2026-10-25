@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CandleChart from "@/components/CandleChart";
+import { dealsFromRecording } from "@/lib/replay/deals";
 import { defaultSpeed, playbackAt, tickRange } from "@/lib/replay/playback";
 import { fetchReplay, fetchReplayComments, postReplayComment, type StoredReplay } from "@/lib/replay/storage";
 import type { ReplayComment } from "@/lib/replay/types";
@@ -187,6 +188,7 @@ export default function ReplayPlayer({ id }: { id: string }) {
   };
 
   const state = useMemo(() => (rec ? playbackAt(rec, tick) : null), [rec, tick]);
+  const dealOverlays = useMemo(() => (rec ? dealsFromRecording(rec, tick) : []), [rec, tick]);
 
   const visibleChat = useMemo(() => timeline.filter((m) => m.t <= tick).slice(-60), [timeline, tick]);
   const visibleChatLen = visibleChat.length;
@@ -241,11 +243,11 @@ export default function ReplayPlayer({ id }: { id: string }) {
       <header className="border-b border-slate-800 bg-slate-900/80 px-4 py-3">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-3">
-            <Link href="/" className="font-bold text-emerald-400">
-              ◆ Tradr
+            <Link href="/tradili" className="font-bold text-emerald-400">
+              ◆ Tradili
             </Link>
-            <span className="rounded bg-fuchsia-500/15 px-2 py-0.5 text-xs font-semibold uppercase text-fuchsia-300">
-              Replay · {rec.mode === "multiplayer" ? "Multiplayer" : "Solo"}
+            <span className="rounded bg-rose-500/15 px-2 py-0.5 text-xs font-semibold uppercase text-rose-300">
+              Tape · {rec.mode === "multiplayer" ? "Multiplayer" : "Solo"}
             </span>
             <span className="truncate text-sm text-slate-400" data-testid="replay-title">
               {rec.marketLabel}
@@ -263,6 +265,7 @@ export default function ReplayPlayer({ id }: { id: string }) {
               candles={state.candles}
               position={me?.position ? { ...me.position, size: 0, openBar: 0 } : null}
               botPositions={others}
+              dealOverlays={dealOverlays}
               height={380}
             />
             <div className="danmaku-track pointer-events-none absolute inset-0 overflow-hidden rounded-lg" data-testid="replay-danmaku">

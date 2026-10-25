@@ -5,6 +5,7 @@ import { GameEngine, equity, STARTING_BALANCE } from "@/lib/sim/engine";
 import type { Candle, Side } from "@/lib/sim/types";
 import type { DanmakuItem } from "@/components/DanmakuOverlay";
 import { HOST_PEER_ID, webrtcManager, type PeerMessage } from "@/lib/p2p/webrtc-manager";
+import { chatFromRecording } from "@/lib/replay/deals";
 import { ReplayRecorder } from "@/lib/replay/recorder";
 import { saveReplay } from "@/lib/replay/storage";
 import type { ReplayEvent } from "@/lib/replay/types";
@@ -555,7 +556,17 @@ export function useLocalMultiplayer(name: string, isHost: boolean, initialPeerNa
       ...others.map((o, i) => ({ id: `o${i}`, name: "", color: "", equity: o.equity, returnPct: 0, side: null, isMe: false, isBot: true })),
     ].sort((a, b) => b.equity - a.equity);
     const marketId = marketIdRef.current;
-    const review = buildMultiplayerReview(e, roundCandlesRef.current, rows, "LOCAL", roundNumberRef.current, e.market.label, marketId);
+    const chatForReview = rec ? chatFromRecording(rec) : [];
+    const review = buildMultiplayerReview(
+      e,
+      roundCandlesRef.current,
+      rows,
+      "LOCAL",
+      roundNumberRef.current,
+      e.market.label,
+      marketId,
+      chatForReview,
+    );
     review.summary.totalPlayers = others.length + 1;
     review.summary.rank = 1 + others.filter((o) => o.equity > eqMe).length;
     const id = `lmp-${seedRef.current.toString(36)}-r${roundNumberRef.current}`;

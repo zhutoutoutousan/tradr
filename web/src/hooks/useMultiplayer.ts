@@ -14,6 +14,7 @@ import {
   ROOM_HEARTBEAT_MS,
 } from "@/lib/multiplayer/roomDirectory";
 import { type MpRole } from "@/lib/multiplayer/lobby";
+import { chatFromRecording } from "@/lib/replay/deals";
 import { ReplayRecorder } from "@/lib/replay/recorder";
 import { saveReplay } from "@/lib/replay/storage";
 import type { ReplayEvent } from "@/lib/replay/types";
@@ -986,6 +987,9 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
     }
     rows.sort((a, b) => b.equity - a.equity);
 
+    const rec = recorderRef.current;
+    const recording = rec ? rec.finish(e) : null;
+    const chatForReview = recording ? chatFromRecording(recording) : [];
     const review = buildMultiplayerReview(
       e,
       roundCandlesRef.current,
@@ -994,14 +998,14 @@ export function useMultiplayer(room: string, name: string, role: MpRole = "playe
       roundNumberRef.current,
       e.market.label,
       instrumentRef.current,
+      chatForReview,
     );
     const setup = mpRoundSetup(instrumentRef.current);
 
-    const rec = recorderRef.current;
     const startEpoch = startEpochRef.current;
-    const id = rec && startEpoch != null ? multiplayerReplayId(room, roundNumberRef.current, startEpoch) : null;
-    const replaySaved: Promise<string | null> = id && rec
-      ? saveReplay(id, rec.finish(e))
+    const id = recording && startEpoch != null ? multiplayerReplayId(room, roundNumberRef.current, startEpoch) : null;
+    const replaySaved: Promise<string | null> = id && recording
+      ? saveReplay(id, recording)
           .then(() => {
             setReplayId(id);
             return id;

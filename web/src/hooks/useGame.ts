@@ -15,7 +15,9 @@ import {
   type RoundSummary,
 } from "@/lib/game/achievements";
 import { POWERUPS, POWERUPS_BY_ID, type PowerupId } from "@/lib/game/powerups";
-import type { DealTrade, RoundReview } from "@/lib/game/reviews";
+import type { DealTrade, ReviewStanding, RoundReview } from "@/lib/game/reviews";
+import { buildMatchStats } from "@/lib/game/matchStats";
+import { chatFromRecording } from "@/lib/replay/deals";
 import { instrumentLabel, type RoundSetup } from "@/lib/game/roundSetup";
 import type { GhostBotSpec } from "@/lib/sim/ghostReplay";
 import type { MarketOption } from "@/components/GameView";
@@ -278,7 +280,10 @@ export function useGame(config: GameConfig, markets: MarketOption[] = []) {
     if (forming && candles[candles.length - 1]?.time !== forming.time) {
       candles.push({ ...forming });
     }
-    const trades: DealTrade[] = e.player.account.closed.map((t) => {
+    const toDeal = (
+      t: { side: "long" | "short"; entry: number; exit: number; size: number; pnl: number; openBar: number; closeBar: number },
+      meta: { traderId: string; traderName: string; traderKind: "player" | "bot" | "human"; color: string },
+    ): DealTrade => {
       const notional = t.entry * t.size;
       return {
         side: t.side,
@@ -291,18 +296,60 @@ export function useGame(config: GameConfig, markets: MarketOption[] = []) {
         closeBar: t.closeBar,
         openDate: barDate(candles, t.openBar),
         closeDate: barDate(candles, t.closeBar),
+        ...meta,
       };
-    });
+    };
+
+    // Player-only list kept for ghost/play-alongside backward compatibility.
+    const trades: DealTrade[] = e.player.account.closed.map((t) =>
+      toDeal(t, { traderId: "you", traderName: "You", traderKind: "player", color: "#34d399" }),
+    );
+    const botDeals: DealTrade[] = e.bots.flatMap((b) =>
+      b.account.closed.map((t) =>
+        toDeal(t, { traderId: b.id, traderName: b.name, traderKind: "bot", color: b.color }),
+      ),
+    );
+    const allTrades = [...trades, ...botDeals];
+
+    const reviewStandings: ReviewStanding[] = standings.map((s) => ({
+      id: s.id,
+      name: s.name,
+      color: s.color,
+      kind: s.kind === "bot" ? "bot" : "player",
+      equity: s.equity,
+      returnPct: s.returnPct,
+      trades: s.trades,
+      wins: s.wins,
+    }));
+
+    const replay = recorderRef.current?.finish(e);
+    const chat = replay ? chatFromRecording(replay) : [];
 
     const inst = instrumentLabel(config.setup.instrumentId, markets);
+    const marketLabel = `${inst} · ${config.setup.timeframeLabel}`;
+    const matchStats = buildMatchStats({
+      marketLabel,
+      mode: config.challenge ? "challenge" : "solo",
+      standings: reviewStandings,
+      playerTrades: trades,
+      allTrades,
+      chatCount: chat.length,
+      durationMs: roundMsRef.current,
+    });
+
     const review: RoundReview = {
+      v: 2,
       id: `round-${config.seed}-${Date.now()}`,
       createdAt: Date.now(),
       marketId: config.setup.instrumentId,
-      marketLabel: `${inst} · ${config.setup.timeframeLabel}`,
+      marketLabel,
       seed: config.seed,
       candles: candles.map((c) => ({ ...c })),
       trades,
+      allTrades,
+      standings: reviewStandings,
+      chat,
+      matchStats,
       summary: {
         returnPct: player.returnPct,
         profit: summary.profit,
@@ -323,7 +370,7 @@ export function useGame(config: GameConfig, markets: MarketOption[] = []) {
       eloDelta: eloAfter - eloBefore,
       newAchievements,
       review,
-      replay: recorderRef.current?.finish(e),
+      replay,
     });
   }, [config, markets]);
 

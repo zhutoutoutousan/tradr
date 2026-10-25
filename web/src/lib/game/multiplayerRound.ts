@@ -1,10 +1,12 @@
 import { STARTING_BALANCE, equity, type GameEngine } from "@/lib/sim/engine";
 import type { Candle } from "@/lib/sim/types";
-import type { DealTrade, RoundReview } from "@/lib/game/reviews";
+import type { DealTrade, ReviewStanding, RoundReview } from "@/lib/game/reviews";
 import type { RoundSetup } from "@/lib/game/roundSetup";
 import { saveAnonymousGame } from "@/lib/game/anonymousGames";
+import { buildMatchStats } from "@/lib/game/matchStats";
 import type { RoundResult } from "@/hooks/useGame";
 import type { LeaderRow } from "@/hooks/useMultiplayer";
+import type { ReviewChatMsg } from "@/lib/game/reviews";
 
 function barDate(candles: Candle[], bar: number): string | undefined {
   return candles.find((c) => c.time === bar)?.date;
@@ -28,6 +30,7 @@ export function buildMultiplayerReview(
   roundNumber: number,
   marketLabel: string,
   marketId: string,
+  chat: ReviewChatMsg[] = [],
 ): RoundReview {
   const price = engine.market.currentPrice;
   const eq = equity(engine.player, price);
@@ -41,7 +44,10 @@ export function buildMultiplayerReview(
     series.push({ ...forming });
   }
 
-  const trades: DealTrade[] = engine.player.account.closed.map((t) => {
+  const toDeal = (
+    t: { side: "long" | "short"; entry: number; exit: number; size: number; pnl: number; openBar: number; closeBar: number },
+    meta: { traderId: string; traderName: string; traderKind: "player" | "bot" | "human"; color: string },
+  ): DealTrade => {
     const notional = t.entry * t.size;
     return {
       side: t.side,
@@ -54,19 +60,55 @@ export function buildMultiplayerReview(
       closeBar: t.closeBar,
       openDate: barDate(series, t.openBar),
       closeDate: barDate(series, t.closeBar),
+      ...meta,
     };
-  });
+  };
 
+  const trades: DealTrade[] = engine.player.account.closed.map((t) =>
+    toDeal(t, { traderId: "you", traderName: "You", traderKind: "player", color: "#34d399" }),
+  );
+  const botDeals: DealTrade[] = engine.bots.flatMap((b) =>
+    b.account.closed.map((t) =>
+      toDeal(t, { traderId: b.id, traderName: b.name, traderKind: "bot", color: b.color }),
+    ),
+  );
+  // Remote humans: leaderboard rows that are not me/bot — no closed-trade ledger here;
+  // their deals live in the tick replay when available.
+  const humanStandings: ReviewStanding[] = leaderboard.map((r) => ({
+    id: r.id,
+    name: r.name,
+    color: r.color,
+    kind: r.isBot ? "bot" : r.isMe ? "player" : "human",
+    equity: r.equity,
+    returnPct: r.returnPct,
+    trades: r.isMe ? trades.length : 0,
+    wins: r.isMe ? wins : 0,
+  }));
+
+  const allTrades = [...trades, ...botDeals];
+  const label = `${marketLabel} · room ${room}`;
   const seed = roundNumber > 0 ? `${room}:${roundNumber}` : room;
 
   return {
+    v: 2,
     id: `mp-${room}-r${roundNumber}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     createdAt: Date.now(),
     marketId,
-    marketLabel: `${marketLabel} · room ${room}`,
+    marketLabel: label,
     seed: hashSeed(seed),
     candles: series,
     trades,
+    allTrades,
+    standings: humanStandings,
+    chat,
+    matchStats: buildMatchStats({
+      marketLabel: label,
+      mode: "multiplayer",
+      standings: humanStandings,
+      playerTrades: trades,
+      allTrades,
+      chatCount: chat.length,
+    }),
     summary: {
       returnPct,
       profit: eq - STARTING_BALANCE,

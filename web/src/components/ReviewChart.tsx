@@ -209,31 +209,35 @@ export default function ReviewChart({
       ctx.fillRect(x - candleW / 2, top, candleW, h);
     });
 
+    // MT5-style: entry → exit connector + arrows (trader color when present).
     trades.forEach((t, idx) => {
       const x1 = xForBar(t.openBar);
       const x2 = xForBar(t.closeBar);
-      if (x1 == null || x2 == null) return;
+      if (x1 == null && x2 == null) return;
       const y1 = y(t.entry);
       const y2 = y(t.exit);
       const win = t.pnl >= 0;
       const focused = focusIdx === idx;
-      const lineColor = win ? "#4ade80" : "#f87171";
+      const traderColor = t.color;
+      const lineColor = traderColor ?? (win ? "#4ade80" : "#f87171");
 
-      ctx.strokeStyle = lineColor;
-      ctx.globalAlpha = focused ? 0.95 : 0.45;
-      ctx.lineWidth = focused ? 2 : 1;
-      ctx.setLineDash([4, 3]);
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 1;
-      ctx.lineWidth = 1;
+      if (x1 != null && x2 != null) {
+        ctx.strokeStyle = lineColor;
+        ctx.globalAlpha = focused ? 0.95 : t.traderKind === "bot" ? 0.35 : 0.55;
+        ctx.lineWidth = focused ? 2.25 : 1.25;
+        ctx.setLineDash(t.traderKind === "bot" ? [3, 3] : [5, 3]);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = 1;
+      }
 
       const drawArrow = (x: number, py: number, side: "long" | "short", kind: "entry" | "exit") => {
         const buy = kind === "entry" ? side === "long" : side === "short";
-        const color = buy ? UP : DOWN;
+        const color = traderColor ?? (buy ? UP : DOWN);
         ctx.fillStyle = color;
         ctx.strokeStyle = focused ? "#fff" : color;
         ctx.lineWidth = focused ? 1.5 : 0.5;
@@ -253,15 +257,24 @@ export default function ReviewChart({
         ctx.stroke();
       };
 
-      drawArrow(x1, y1, t.side, "entry");
-      drawArrow(x2, y2, t.side, "exit");
+      if (x1 != null) drawArrow(x1, y1, t.side, "entry");
+      if (x2 != null) drawArrow(x2, y2, t.side, "exit");
+
+      if (focused && t.traderName && x1 != null) {
+        ctx.fillStyle = "#e2e8f0";
+        ctx.font = "10px ui-monospace, monospace";
+        ctx.fillText(t.traderName.split(" ")[0], x1 + 6, y1 - 8);
+      }
     });
 
     ctx.font = "10px ui-monospace, monospace";
     ctx.fillStyle = TEXT;
     const rangeEnd = Math.min(candles.length, start + visible.length);
+    const bots = trades.filter((t) => t.traderKind === "bot").length;
     ctx.fillText(
-      `bars ${start + 1}–${rangeEnd} of ${candles.length} · ${trades.length} deals · drag or scroll to pan`,
+      `bars ${start + 1}–${rangeEnd} of ${candles.length} · ${trades.length} deals` +
+        (bots ? ` (${bots} bot)` : "") +
+        ` · drag or scroll to pan`,
       6,
       plotH - 4,
     );

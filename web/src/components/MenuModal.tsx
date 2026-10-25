@@ -92,11 +92,11 @@ export default function MenuModal({
                   ⚔ Multiplayer race
                 </Link>
                 <Link
-                  href="/community"
+                  href="/tradili"
                   data-testid="menu-community-gallery"
-                  className="rounded-lg border border-sky-500/60 px-4 py-2 font-semibold text-sky-300 hover:bg-sky-500/10"
+                  className="rounded-lg border border-rose-500/60 px-4 py-2 font-semibold text-rose-300 hover:bg-rose-500/10"
                 >
-                  Community gallery
+                  Tradili
                 </Link>
               </div>
             </div>
@@ -105,19 +105,19 @@ export default function MenuModal({
           {tab === "community" && (
             <div className="space-y-4 text-sm">
               <p className="text-slate-400">
-                Browse anonymous solo rounds from other traders in the community gallery. Watch any match or play
-                alongside their recorded trades as the Peer trader bot.
+                Tradili — race tapes with danmaku, chat, and MT5 deal lines for players and bots. Watch any match or
+                play alongside their recorded trades as the Peer trader bot.
               </p>
               <p className="text-slate-500">
                 Finish a solo round and yours is saved automatically. Filter by peers or your own runs.
               </p>
               <Link
-                href="/community"
+                href="/tradili"
                 data-testid="menu-community-gallery"
                 onClick={onClose}
-                className="inline-block rounded-lg bg-sky-600 px-5 py-2.5 font-semibold text-white hover:bg-sky-500"
+                className="inline-block rounded-lg bg-rose-600 px-5 py-2.5 font-semibold text-white hover:bg-rose-500"
               >
-                Open community gallery →
+                Open Tradili →
               </Link>
             </div>
           )}

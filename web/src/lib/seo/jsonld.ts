@@ -28,7 +28,7 @@ export function webApplicationJsonLd() {
     featureList: [
       "3-minute solo trading races vs algorithmic bots",
       "Multiplayer rooms with open room browser",
-      "Community gallery of anonymous trading runs",
+      "Tradili race tapes with danmaku, chat, and MT5 deal lines",
       "Play alongside recorded sessions as a replay bot",
       "Historical markets: forex, gold, stocks, crypto",
     ],

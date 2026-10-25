@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import ClearSWButton from "@/components/ClearSWButton";
+import TradiliStrip from "@/components/TradiliStrip";
 import { authService, type UserProfile } from "@/lib/auth/supabase-auth";
 
 export type GameMode = "solo" | "challenge" | "multiplayer" | "local-multiplayer";
@@ -192,6 +193,8 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
           </span>
         </Link>
       )}
+
+      <TradiliStrip />
 
       <div className="col-span-full px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center">
         <p className="text-xs text-slate-600">

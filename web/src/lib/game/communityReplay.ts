@@ -59,5 +59,5 @@ export function buildCommunityReplayConfig(
 }
 
 export function communityReplayBanner(game: CommunityGame): string {
-  return `Gallery replay · ${game.marketLabel}`;
+  return `Tradili tape · ${game.marketLabel}`;
 }
