@@ -2,14 +2,15 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = pageMetadata({
-  title: "Tradili — race tapes & danmaku",
+  title: "Tradili — race tapes, markets & papers",
   description:
-    "Tradili (Tradr × Bilibili × YouTube): browse historical race tapes with danmaku, chat, MT5-style deal lines for players and bots, and sports box scores.",
+    "Tradili (Tradr × Bilibili × YouTube): race tapes with danmaku, finance news from free RSS, arXiv quant papers, and MT5-style deal lines.",
   path: "/tradili",
   keywords: [
     "Tradili",
     "trading replay",
-    "trading game gallery",
+    "finance news RSS",
+    "arXiv quantitative finance",
     "danmaku trading",
     "MT5 deal lines",
     "Tradr replays",

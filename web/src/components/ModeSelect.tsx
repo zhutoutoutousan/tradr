@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import ClearSWButton from "@/components/ClearSWButton";
-import TradiliStrip from "@/components/TradiliStrip";
 import { authService, type UserProfile } from "@/lib/auth/supabase-auth";
 
 export type GameMode = "solo" | "challenge" | "multiplayer" | "local-multiplayer";
@@ -52,7 +51,7 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
       className={
         isMobile
           ? "flex min-h-[100dvh] w-full max-w-[100vw] flex-col overflow-x-hidden bg-slate-950 text-slate-100"
-          : "grid min-h-[100dvh] w-full max-w-[100vw] grid-cols-3 grid-rows-[1fr_1fr_auto_auto] overflow-x-hidden bg-slate-950 text-slate-100"
+          : "grid min-h-[100dvh] w-full max-w-[100vw] grid-cols-3 grid-rows-[1fr_1fr_1fr_auto] overflow-x-hidden bg-slate-950 text-slate-100"
       }
     >
       <ClearSWButton />
@@ -156,11 +155,32 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
         </span>
       </Link>
 
+      <Link
+        href="/tradili"
+        data-testid="mode-tradili"
+        className={`group flex min-w-0 flex-col items-center justify-center text-center transition hover:bg-slate-900 ${tilePad} ${
+          isMobile ? "min-h-[22vh] border-b border-slate-800" : "border-b border-slate-800"
+        }`}
+      >
+        <div className={tileIcon}>📺</div>
+        <div className="min-w-0 px-1">
+          <h2 className={`font-extrabold text-rose-400 ${tileTitle}`}>Tradili</h2>
+          <p className={`text-slate-400 ${tileBody}`}>
+            {isMobile
+              ? "Race tapes, news & papers."
+              : "Race tapes, danmaku, finance news & arXiv — Bilibili × YouTube × Tradr."}
+          </p>
+        </div>
+        <span className={`bg-rose-500 text-slate-950 group-hover:bg-rose-400 ${tileCta}`}>
+          Open Tradili
+        </span>
+      </Link>
+
       {user && profile ? (
         <Link
           href="/profile"
           className={`group flex min-w-0 flex-col items-center justify-center text-center transition hover:bg-slate-900 ${tilePad} ${
-            isMobile ? "min-h-[22vh] border-b border-slate-800" : "border-b border-slate-800"
+            isMobile ? "min-h-[22vh] border-b border-slate-800" : "border-r border-b border-slate-800"
           }`}
         >
           <div className={tileIcon}>👤</div>
@@ -199,12 +219,12 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
         <Link
           href="/register"
           className={`group flex min-w-0 flex-col items-center justify-center text-center transition hover:bg-slate-900 ${tilePad} ${
-            isMobile ? "min-h-[22vh] border-b border-slate-800" : "border-b border-slate-800"
+            isMobile ? "min-h-[22vh] border-b border-slate-800" : "border-r border-b border-slate-800"
           }`}
         >
           <div className={tileIcon}>🔐</div>
           <div className="min-w-0 px-1">
-            <h2 className={`font-extrabold text-rose-400 ${tileTitle}`}>Login / Register</h2>
+            <h2 className={`font-extrabold text-orange-400 ${tileTitle}`}>Login / Register</h2>
             <p className={`text-slate-400 ${tileBody}`}>
               {isMobile ? "Save progress & climb the ladder." : "Save your progress, track stats & compete on leaderboards."}
             </p>
@@ -212,13 +232,11 @@ export default function ModeSelect({ onPick }: { onPick: (mode: GameMode) => voi
               <p className="text-[11px] font-semibold text-amber-300 sm:text-xs">💎 Early Supporter: Free Forever!</p>
             </div>
           </div>
-          <span className={`bg-rose-500 text-slate-950 group-hover:bg-rose-400 ${tileCta}`}>
+          <span className={`bg-orange-500 text-slate-950 group-hover:bg-orange-400 ${tileCta}`}>
             Login
           </span>
         </Link>
       )}
-
-      <TradiliStrip />
 
       <div className="col-span-full w-full min-w-0 px-3 py-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center sm:px-4 sm:py-3">
         <p className="truncate text-[11px] text-slate-600 sm:text-xs">
