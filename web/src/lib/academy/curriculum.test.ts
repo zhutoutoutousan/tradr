@@ -8,10 +8,11 @@ import {
 } from "./progress";
 
 describe("academy curriculum", () => {
-  it("has five tracks and unique lesson ids", () => {
-    expect(TRACKS).toHaveLength(5);
+  it("has six tracks and unique lesson ids", () => {
+    expect(TRACKS).toHaveLength(6);
     const ids = LESSONS.map((l) => l.id);
     expect(new Set(ids).size).toBe(ids.length);
+    expect(TRACKS.some((t) => t.id === "desk")).toBe(true);
   });
 
   it("orders lessons inside a track", () => {
