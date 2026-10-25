@@ -38,9 +38,14 @@ export function difficultyForElo(playerElo: number): number {
 // Build the roguelike field for a round. Seeded by the round seed so a given
 // seed always reproduces the same opponents; tuned by the player's ELO so the
 // field gets tougher (bigger size, sharper params, higher rating) as you climb.
-export function generateBots(seed: number, playerElo: number = BASE_ELO, count = 6): BotSpec[] {
+export function generateBots(
+  seed: number,
+  playerElo: number = BASE_ELO,
+  count = 6,
+  opts?: { difficulty?: number },
+): BotSpec[] {
   const r = new RNG((seed ^ 0x9e3779b9) >>> 0);
-  const difficulty = difficultyForElo(playerElo);
+  const difficulty = opts?.difficulty ?? difficultyForElo(playerElo);
   const order = r.shuffle(ARCHETYPES);
   const usedSurnames = new Set<string>();
 

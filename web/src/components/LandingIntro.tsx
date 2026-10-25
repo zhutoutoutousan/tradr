@@ -76,6 +76,12 @@ export default function LandingIntro({
               </Link>
             )}
             <Link
+              href="/academy"
+              className="rounded-lg border border-amber-500/50 px-3 py-1.5 text-sm font-semibold text-amber-300 hover:bg-amber-500/10"
+            >
+              Academy
+            </Link>
+            <Link
               href="/bots"
               className="rounded-lg border border-fuchsia-500/50 px-3 py-1.5 text-sm font-semibold text-fuchsia-300 hover:bg-fuchsia-500/10"
             >
