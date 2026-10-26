@@ -8,11 +8,19 @@ import {
 } from "./progress";
 
 describe("academy curriculum", () => {
-  it("has six tracks and unique lesson ids", () => {
-    expect(TRACKS).toHaveLength(6);
+  it("has seven tracks including meta and unique lesson ids", () => {
+    expect(TRACKS).toHaveLength(7);
     const ids = LESSONS.map((l) => l.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(TRACKS.some((t) => t.id === "desk")).toBe(true);
+    expect(TRACKS.some((t) => t.id === "meta")).toBe(true);
+    expect(lessonsForTrack("meta").length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("meta lessons carry polyglot tags", () => {
+    const paper = getLesson("meta-02-paper-muscle");
+    expect(paper?.polyglotIds).toContain("paper-muscle");
+    expect(paper?.quiz?.length).toBeGreaterThan(0);
   });
 
   it("orders lessons inside a track", () => {

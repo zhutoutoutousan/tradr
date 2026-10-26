@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   PLANET_BOOKS,
@@ -13,6 +13,15 @@ import {
   neighborsOf,
   type PlanetNode,
 } from "@/lib/academy/planet";
+import {
+  lexiconByTopic,
+  lexiconForLesson,
+  loadLangSettings,
+  saveLangSettings,
+  type AcademyLangSettings,
+} from "@/lib/academy/polyglot";
+import BilingualPanel from "./BilingualPanel";
+import LangPairSettings from "./LangPairSettings";
 
 const SIZE = 640;
 const CX = SIZE / 2;
@@ -29,6 +38,11 @@ export default function LearningPlanet() {
   const [selectedId, setSelectedId] = useState("tradr-planet");
   const [drillPick, setDrillPick] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
+  const [lang, setLang] = useState<AcademyLangSettings | null>(null);
+
+  useEffect(() => {
+    setLang(loadLangSettings());
+  }, []);
 
   const selected = getPlanetNode(selectedId) ?? PLANET_NODES[0];
   const nbrs = useMemo(() => neighborsOf(selected.id), [selected.id]);
@@ -36,6 +50,30 @@ export default function LearningPlanet() {
   const book = selected.bookId ? getPlanetBook(selected.bookId) : null;
 
   const activeDrill = drillPick ? getPlanetDrill(drillPick) : drill;
+
+  const bilingualUnits = useMemo(() => {
+    if (selected.id === "domain-polyglot" || selected.id === "c-dual-subtitle") {
+      return lexiconForLesson({
+        polyglotIds: ["dual-subtitle", "bid-ask", "sharpe", "nash-mm"],
+        polyglotTopics: ["meta"],
+      });
+    }
+    if (selected.id === "domain-meta" || selected.id === "c-paper-muscle" || selected.id === "drill-meta-probe") {
+      return lexiconByTopic("meta");
+    }
+    if (selected.id === "paper-mm-eq" || selected.id === "c-nash" || selected.id === "c-spread") {
+      return lexiconForLesson({
+        polyglotIds: ["nash-mm", "bid-ask", "paper-muscle"],
+        polyglotTopics: ["market-making", "microstructure"],
+      });
+    }
+    return lexiconByTopic("meta").slice(0, 2);
+  }, [selected.id]);
+
+  const updateLang = (next: AcademyLangSettings) => {
+    saveLangSettings(next);
+    setLang(next);
+  };
 
   const positions = useMemo(() => {
     const m = new Map<string, { x: number; y: number }>();
@@ -51,10 +89,16 @@ export default function LearningPlanet() {
           Quant <span className="bg-gradient-to-r from-rose-400 via-amber-300 to-sky-400 bg-clip-text text-transparent">学习星球</span>
         </h1>
         <p className="mt-2 text-sm text-slate-400">
-          mindcraft-style knowledge graph for Tradr — market making research, interview probes, and a desk library.
-          Cold PROBE first; every star carries a SOURCE.
+          mindcraft-style knowledge graph — market making, meta-learning / polyglot dual study, interview probes, desk
+          library. Cold PROBE first; every star carries a SOURCE.
         </p>
       </div>
+
+      {lang ? (
+        <div className="mb-6">
+          <LangPairSettings value={lang} onChange={updateLang} />
+        </div>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-[#050814]">
@@ -148,6 +192,10 @@ export default function LearningPlanet() {
 
         <aside className="flex min-w-0 flex-col gap-4">
           <Inspector node={selected} nbrs={nbrs} onJump={setSelectedId} />
+
+          {lang && bilingualUnits.length ? (
+            <BilingualPanel units={bilingualUnits} settings={lang} title="Orbit dual · 轨道双语" />
+          ) : null}
 
           {activeDrill ? (
             <DrillCard

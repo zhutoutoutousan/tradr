@@ -55,4 +55,10 @@ describe("learning planet graph", () => {
     expect(n.length).toBeGreaterThan(0);
     expect(n.some((x) => x.node.id === "domain-mm")).toBe(true);
   });
+
+  it("includes meta learning and polyglot domains", () => {
+    expect(getPlanetNode("domain-meta")?.href).toBe("/academy/tracks/meta");
+    expect(getPlanetNode("c-dual-subtitle")?.href).toContain("meta-03");
+    expect(getPlanetDrill("drill-meta-probe")?.choices.filter((c) => c.correct)).toHaveLength(1);
+  });
 });
