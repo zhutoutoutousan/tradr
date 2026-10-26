@@ -244,11 +244,27 @@ export default function TradiliFeed() {
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Research rack</h2>
             <p className="text-[11px] text-slate-600">arXiv q-fin.TR / CP / ST</p>
           </div>
+          <a
+            href="https://arxiv.org/abs/2610.30891"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mb-3 block rounded-xl border border-rose-500/30 bg-gradient-to-r from-rose-950/40 to-slate-900/60 px-3 py-3 transition hover:border-rose-400/50"
+            data-testid="tradili-featured-paper"
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-300">Featured · Academy Planet</p>
+            <p className="mt-1 text-sm font-semibold text-white">
+              Equilibria and Learning in Competitive Market Making
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Onger &amp; Foscari · arXiv:2610.30891 — PSNE, volatility-scaled spreads, no-regret learning. Also on{" "}
+              <span className="text-rose-300">/academy/planet</span>.
+            </p>
+          </a>
           {loadingInfo ? (
             <p className="text-sm text-slate-500">Fetching papers…</p>
           ) : papers.length === 0 ? (
             <p className="rounded-xl border border-slate-800 bg-slate-900/40 px-4 py-6 text-sm text-slate-500">
-              arXiv feed unavailable — try again later.
+              Live arXiv feed unavailable — featured paper above still works.
             </p>
           ) : (
             <div className="grid gap-3 lg:grid-cols-2">

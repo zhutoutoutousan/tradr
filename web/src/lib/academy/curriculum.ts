@@ -4,7 +4,7 @@
  * Deliberately does NOT include WorldQuant Alpha101 paper formulas.
  */
 
-export type TrackId = "foundations" | "signals" | "alpha-craft" | "agents" | "campaign";
+export type TrackId = "foundations" | "signals" | "alpha-craft" | "agents" | "campaign" | "desk";
 
 export type LessonKind = "read" | "quiz" | "lab" | "play";
 
@@ -94,6 +94,14 @@ export const TRACKS: AcademyTrack[] = [
     blurb: "Put it on the line — Story & Challenge levels from Academy.",
     accent: "text-violet-300",
     icon: "🗺️",
+    requires: { trackId: "foundations", lessons: 1 },
+  },
+  {
+    id: "desk",
+    title: "Quant Desk",
+    blurb: "Learning Planet — interview probes, desk books, market-making research.",
+    accent: "text-rose-300",
+    icon: "🪐",
     requires: { trackId: "foundations", lessons: 1 },
   },
 ];
@@ -583,6 +591,120 @@ export const LESSONS: AcademyLesson[] = [
       {
         heading: "Path",
         body: "Challenges demand precise objectives (few trades, huge returns, gauntlets). Unlock them by clearing Story stars — then climb toward Impossible.",
+      },
+    ],
+  },
+
+  // ── Quant Desk / Learning Planet ────────────────────────────
+  {
+    id: "desk-01-planet",
+    trackId: "desk",
+    order: 1,
+    title: "Enter the Learning Planet",
+    summary: "mindcraft-style KG: domains, papers, drills, library — with SOURCE.",
+    minutes: 5,
+    kind: "read",
+    xp: 50,
+    sections: [
+      {
+        heading: "学习星球",
+        body: "Tradr's Learning Planet is a small teaching ontology inspired by mindcraft-zttts: vertices (domains, concepts, papers, books, drills) and labeled edges (ISA, GROUNDS_IN, APPLIES…). Click a star to inspect CLAIM + SOURCE. The GUI is a skin over the graph — not a note dump.",
+      },
+      {
+        heading: "Study loop",
+        body: "PROBE cold → your ANSWER → ASSESS → only then open sources. Interview rails on the Planet follow the same retrieval-first rule. Do not paste proprietary answer banks into the graph.",
+      },
+      {
+        heading: "Open the sky",
+        body: "Launch /academy/planet to orbit Market Making, Microstructure, Interview Desk, and the Library. Featured research includes competitive market-making equilibria (arXiv:2610.30891).",
+      },
+    ],
+  },
+  {
+    id: "desk-02-mm-paper",
+    trackId: "desk",
+    order: 2,
+    title: "Competitive market making (paper star)",
+    summary: "Onger & Foscari — PSNE, volatility-scaled spreads, no-regret learning.",
+    minutes: 8,
+    kind: "read",
+    xp: 70,
+    sections: [
+      {
+        heading: "Why this paper",
+        body: "Equilibria and Learning in Competitive Market Making (arXiv:2610.30891) models N≥2 strategic makers plus one non-strategic informed trader with inelastic demand. Quotes set the mid; the trader buys or sells by comparing fundamental value to that mid.",
+      },
+      {
+        heading: "Takeaways for a Tradr desk",
+        body: "(1) Pure-strategy Nash equilibria exist under mild assumptions and give a zero-profit competitive benchmark. (2) For location-scale value distributions, equilibrium spreads widen linearly with volatility — so wider spreads are not automatic proof of collusion. (3) On a price grid, no-internal-regret learners' average play approaches the continuous Nash envelope as tick size vanishes.",
+      },
+      {
+        heading: "How to use it here",
+        body: "Open the Planet paper star, run the Spread × Volatility drill, then race in Tradr while watching how your own 'spread' (edge vs bots) behaves when markets get noisy. PDF: https://arxiv.org/pdf/2610.30891",
+      },
+    ],
+  },
+  {
+    id: "desk-03-interview",
+    trackId: "desk",
+    order: 3,
+    title: "Interview arena hygiene",
+    summary: "Firm-flavored probes without cheating yourself.",
+    minutes: 6,
+    kind: "quiz",
+    xp: 60,
+    sections: [
+      {
+        heading: "What we store",
+        body: "Prompts + short ASSESS notes written for Academy. Classics (Zhou green book, Joshi, Crack, Hull, Shreve, Wilmott) live as Library metadata with WorldCat links — never pirated PDFs, never pasted answer essays.",
+      },
+      {
+        heading: "Ritual",
+        body: "Pick a drill on the Planet → answer cold → Check → only then read ASSESS / SOURCE. Space sessions; mix microstructure, Bayes, and evaluation. Soft questions later want project History, not trivia.",
+      },
+    ],
+    quiz: [
+      {
+        id: "q1",
+        prompt: "Best first move when a Planet interview drill appears?",
+        choices: [
+          { id: "a", text: "Open the green book PDF immediately.", correct: false },
+          { id: "b", text: "Answer cold, then check ASSESS / SOURCE.", correct: true },
+          { id: "c", text: "Skip to Bot Factory.", correct: false },
+          { id: "d", text: "Paste ChatGPT into the graph as CLAIM.", correct: false },
+        ],
+        explain: "Retrieval-first — mindcraft interview prep pillar mirrored on Tradr Planet.",
+      },
+      {
+        id: "q2",
+        prompt: "Why might competitive spreads widen when volatility rises?",
+        choices: [
+          { id: "a", text: "Only because makers collude.", correct: false },
+          { id: "b", text: "Zero-profit competitive quotes still price risk; theory can scale spread with σ.", correct: true },
+          { id: "c", text: "Spreads never depend on volatility.", correct: false },
+          { id: "d", text: "Because tick size is illegal.", correct: false },
+        ],
+        explain: "See arXiv:2610.30891 — volatility-driven widening can confound collusion tests.",
+      },
+    ],
+  },
+  {
+    id: "desk-04-library",
+    trackId: "desk",
+    order: 4,
+    title: "Desk library map",
+    summary: "Which book for which interview surface.",
+    minutes: 5,
+    kind: "read",
+    xp: 40,
+    sections: [
+      {
+        heading: "Interview stack",
+        body: "Zhou (green book) + Crack for breadth; Joshi interview book for harder derivatives; Wilmott FAQ for model intuition. Work problems; don't hoard PDFs in the repo.",
+      },
+      {
+        heading: "Theory stack",
+        body: "Hull for industry language; Shreve I/II when you need stochastic calculus. Lefèvre for trader narrative culture. All cards on the Planet Library rail link out to WorldCat/search — buy or borrow legally.",
       },
     ],
   },
