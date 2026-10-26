@@ -6,6 +6,7 @@ import { authService, type UserProfile } from '@/lib/auth/supabase-auth';
 import { supabase } from '@/lib/supabase';
 import { calculateLevel, xpProgress } from '@/lib/game/progress';
 import { replayUrl } from '@/lib/replay/storage';
+import ApiKeysPanel from '@/components/academy/ApiKeysPanel';
 
 interface GameRecord {
   id: string;
@@ -226,6 +227,10 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="mb-8">
+          <ApiKeysPanel />
         </div>
 
         {/* Game History */}

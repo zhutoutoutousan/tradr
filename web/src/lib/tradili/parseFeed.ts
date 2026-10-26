@@ -1,6 +1,6 @@
 /** Pure RSS/Atom parsers used by Tradili info feeds. */
 
-export type FeedKind = "news" | "paper";
+export type FeedKind = "news" | "paper" | "blog";
 
 export interface FeedItem {
   id: string;
@@ -57,7 +57,12 @@ function stripHtml(s: string): string {
   return s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-export function parseRssItems(xml: string, source: string, limit: number): FeedItem[] {
+export function parseRssItems(
+  xml: string,
+  source: string,
+  limit: number,
+  kind: FeedKind = "news",
+): FeedItem[] {
   const chunks = xml.split(/<item[\s>]/i).slice(1);
   const out: FeedItem[] = [];
   for (const raw of chunks) {
@@ -65,11 +70,14 @@ export function parseRssItems(xml: string, source: string, limit: number): FeedI
     const title = tag(block, "title");
     const url = linkFrom(block) || tag(block, "guid");
     if (!title || !url) continue;
-    const summary = stripHtml(tag(block, "description") || tag(block, "summary")).slice(0, 220);
+    const summary = stripHtml(tag(block, "description") || tag(block, "summary") || tag(block, "content:encoded")).slice(
+      0,
+      220,
+    );
     const publishedAt = tag(block, "pubDate") || tag(block, "dc:date") || null;
     out.push({
-      id: `news-${source}-${url}`,
-      kind: "news",
+      id: `${kind}-${source}-${url}`,
+      kind,
       title,
       summary,
       url,
