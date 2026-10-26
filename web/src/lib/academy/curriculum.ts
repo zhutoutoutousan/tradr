@@ -4,7 +4,14 @@
  * Deliberately does NOT include WorldQuant Alpha101 paper formulas.
  */
 
-export type TrackId = "foundations" | "signals" | "alpha-craft" | "agents" | "campaign" | "desk";
+export type TrackId =
+  | "foundations"
+  | "signals"
+  | "alpha-craft"
+  | "agents"
+  | "campaign"
+  | "desk"
+  | "meta";
 
 export type LessonKind = "read" | "quiz" | "lab" | "play";
 
@@ -24,6 +31,8 @@ export interface QuizQuestion {
 export interface LessonSection {
   heading?: string;
   body: string;
+  /** Optional lexicon unit ids for dual-subtitle cards under this section */
+  polyglotIds?: string[];
 }
 
 export interface AcademyLesson {
@@ -44,6 +53,10 @@ export interface AcademyLesson {
   /** XP granted once on first completion */
   xp: number;
   unlocks?: string[];
+  /** QUANT_LEXICON topic tags for the lesson bilingual strip */
+  polyglotTopics?: string[];
+  /** Explicit lexicon unit ids (overrides / extends topics) */
+  polyglotIds?: string[];
 }
 
 export interface AcademyTrack {
@@ -104,6 +117,14 @@ export const TRACKS: AcademyTrack[] = [
     icon: "🪐",
     requires: { trackId: "foundations", lessons: 1 },
   },
+  {
+    id: "meta",
+    title: "Meta Learning",
+    blurb: "形而上学习 — how to read papers, learn knowledge, and study quant bilingually.",
+    accent: "text-cyan-300",
+    icon: "◇",
+    requires: { trackId: "foundations", lessons: 1 },
+  },
 ];
 
 export const LESSONS: AcademyLesson[] = [
@@ -117,6 +138,7 @@ export const LESSONS: AcademyLesson[] = [
     minutes: 4,
     kind: "read",
     xp: 40,
+    polyglotTopics: ["evaluation"],
     sections: [
       {
         heading: "The arena",
@@ -141,6 +163,8 @@ export const LESSONS: AcademyLesson[] = [
     minutes: 5,
     kind: "quiz",
     xp: 60,
+    polyglotTopics: ["evaluation"],
+    polyglotIds: ["sharpe"],
     sections: [
       {
         heading: "Balance vs equity",
@@ -232,6 +256,7 @@ export const LESSONS: AcademyLesson[] = [
     xp: 70,
     labTemplate: "trend",
     botLabHref: "/bots/lab?template=trend",
+    polyglotTopics: ["evaluation"],
     sections: [
       {
         heading: "Idea",
@@ -414,6 +439,8 @@ export const LESSONS: AcademyLesson[] = [
     xp: 80,
     labTemplate: "ema",
     botLabHref: "/bots/lab?template=ema",
+    polyglotTopics: ["evaluation"],
+    polyglotIds: ["overfitting", "sharpe"],
     sections: [
       {
         heading: "Fill model",
@@ -605,6 +632,8 @@ export const LESSONS: AcademyLesson[] = [
     minutes: 5,
     kind: "read",
     xp: 50,
+    polyglotTopics: ["meta"],
+    polyglotIds: ["probe-answer"],
     sections: [
       {
         heading: "学习星球",
@@ -629,6 +658,8 @@ export const LESSONS: AcademyLesson[] = [
     minutes: 8,
     kind: "read",
     xp: 70,
+    polyglotTopics: ["market-making", "microstructure"],
+    polyglotIds: ["nash-mm", "bid-ask", "paper-muscle"],
     sections: [
       {
         heading: "Why this paper",
@@ -705,6 +736,164 @@ export const LESSONS: AcademyLesson[] = [
       {
         heading: "Theory stack",
         body: "Hull for industry language; Shreve I/II when you need stochastic calculus. Lefèvre for trader narrative culture. All cards on the Planet Library rail link out to WorldCat/search — buy or borrow legally.",
+      },
+    ],
+  },
+
+  // ── Meta Learning / 形而上学习 ───────────────────────────────
+  {
+    id: "meta-01-how-to-learn",
+    trackId: "meta",
+    order: 1,
+    title: "How knowledge sticks",
+    summary: "PROBE → ANSWER → ASSESS; retrieval before sources; one concept picture.",
+    minutes: 6,
+    kind: "read",
+    xp: 50,
+    polyglotTopics: ["meta"],
+    polyglotIds: ["probe-answer", "dual-subtitle"],
+    sections: [
+      {
+        heading: "形而上学习",
+        body: "Meta-learning here means learning how you learn quant — not a third calculus course. The loop is mindcraft-shaped: PROBE cold (retrieve), write your ANSWER, ASSESS against a short note, only then open SOURCE. Skipping retrieval turns every lesson into passive reading.",
+        polyglotIds: ["probe-answer"],
+      },
+      {
+        heading: "One concept picture",
+        body: "Hold one language-neutral Concept (e.g. adverse selection). Attach lemmas in your primary gloss and your target language. Dual subtitles put both texts on the same picture — quant first, foreign language as the incidental gain.",
+        polyglotIds: ["dual-subtitle", "adverse-selection"],
+      },
+      {
+        heading: "Tradr wiring",
+        body: "Set your language pair on the Academy hub (e.g. 中文 · Deutsch, or Français ↔ Deutsch). Every lesson with lexicon tags shows a bilingual strip. Planet drills stay retrieval-first; Meta track teaches the ritual.",
+      },
+    ],
+  },
+  {
+    id: "meta-02-paper-muscle",
+    trackId: "meta",
+    order: 2,
+    title: "How to read a paper (paper muscle)",
+    summary: "One OA paper → domain scaffold, not a two-line abstract.",
+    minutes: 8,
+    kind: "quiz",
+    xp: 70,
+    polyglotTopics: ["meta", "market-making"],
+    polyglotIds: ["paper-muscle", "nash-mm"],
+    sections: [
+      {
+        heading: "Fail the cut",
+        body: "A two-sentence summary is not paper muscle. Goal: turn one open-access paper into a domain scaffold — prerequisite vertices, methods taxonomy, evidence grades, and open GAP slots you fill later via PROBE.",
+        polyglotIds: ["paper-muscle"],
+      },
+      {
+        heading: "Six-rung ladder (default)",
+        body: "1) Prerequisites 2) Measurement / body layer 3) Formal frame 4) Figure/results map A 5) Map B or primary contrast 6) Applications with bounds (what the paper does NOT claim). Fog day: one PROBE only.",
+      },
+      {
+        heading: "Worked example on Tradr",
+        body: "arXiv:2610.30891 (competitive market making) is already a Planet paper star. Use it as the scaffold: Nash quotes, volatility-scaled spreads, no-regret learning — then run the Spread × Volatility drill cold.",
+        polyglotIds: ["nash-mm", "bid-ask"],
+      },
+    ],
+    quiz: [
+      {
+        id: "q1",
+        prompt: "Paper muscle means…",
+        choices: [
+          { id: "a", text: "Paste the abstract into Anki and move on.", correct: false },
+          { id: "b", text: "Turn one paper into a domain scaffold with gaps for later PROBEs.", correct: true },
+          { id: "c", text: "Memorize every equation before reading the intro.", correct: false },
+          { id: "d", text: "Only watch conference talks.", correct: false },
+        ],
+        explain: "Scaffold + SOURCE + retrieval — not a two-line blurb.",
+      },
+      {
+        id: "q2",
+        prompt: "Best first move on a Planet paper drill?",
+        choices: [
+          { id: "a", text: "Open the PDF and highlight everything.", correct: false },
+          { id: "b", text: "Answer the probe cold, then check ASSESS / SOURCE.", correct: true },
+          { id: "c", text: "Ask a bot to summarize, then skip the graph.", correct: false },
+        ],
+        explain: "PROBE → ANSWER → ASSESS before sources.",
+      },
+    ],
+  },
+  {
+    id: "meta-03-polyglot-desk",
+    trackId: "meta",
+    order: 3,
+    title: "Quant + foreign language dual study",
+    summary: "Language pairs, dual subtitles, Concept ↔ Lemma_L1/L2.",
+    minutes: 7,
+    kind: "quiz",
+    xp: 60,
+    polyglotTopics: ["meta", "microstructure", "evaluation"],
+    polyglotIds: ["dual-subtitle", "bid-ask", "sharpe"],
+    sections: [
+      {
+        heading: "Pair settings",
+        body: "Primary = language for explanations / L1 gloss. Target = language you are acquiring. Suggested pairs include 中文·Deutsch, 中文·français, English·Español, and Français↔Deutsch bridges. Toggle dual columns on the hub anytime.",
+        polyglotIds: ["dual-subtitle"],
+      },
+      {
+        heading: "Desk lexicon",
+        body: "Bid–ask, adverse selection, Sharpe, overfitting, Nash quotes — each concept ships with surface lines in en/zh/de/fr/es/ja/ru. You study microstructure while the target lemma sticks as a side effect.",
+        polyglotIds: ["bid-ask", "sharpe", "adverse-selection"],
+      },
+      {
+        heading: "Anti-patterns",
+        body: "Do not farm CEFR badges here. Do not drill bare grammar with zero quant lemmas. Do not treat every English tech noun as a gap when it is allowlisted jargon. Job first: learn the market idea; language is the dual subtitle.",
+      },
+    ],
+    quiz: [
+      {
+        id: "q1",
+        prompt: "In Tradr Academy polyglot mode, the main job is…",
+        choices: [
+          { id: "a", text: "CEFR exam prep with random Anki decks.", correct: false },
+          { id: "b", text: "Learn quant concepts; acquire the target language as dual subtitles.", correct: true },
+          { id: "c", text: "Replace all English with emoji.", correct: false },
+        ],
+        explain: "Quant first — foreign language rides along on the same concept picture.",
+      },
+      {
+        id: "q2",
+        prompt: "Français ↔ Deutsch bridge means…",
+        choices: [
+          { id: "a", text: "Primary and target are both Romance languages only.", correct: false },
+          { id: "b", text: "You can set FR as gloss and DE as target (or the reverse) for dual columns.", correct: true },
+          { id: "c", text: "Chinese is required as primary.", correct: false },
+        ],
+        explain: "Any supported pair works — FR/DE is a suggested bridge.",
+      },
+    ],
+  },
+  {
+    id: "meta-04-knowledge-graph",
+    trackId: "meta",
+    order: 4,
+    title: "Knowledge as graph, not notes dump",
+    summary: "Vertices, edges, SOURCE — Planet as the skin over ontology.",
+    minutes: 6,
+    kind: "read",
+    xp: 50,
+    polyglotTopics: ["meta"],
+    polyglotIds: ["probe-answer", "paper-muscle"],
+    sections: [
+      {
+        heading: "Ontology membrane",
+        body: "Learning Planet is a teaching ontology: domains, concepts, papers, books, drills, bridges. Edges (ISA, GROUNDS_IN, APPLIES, STUDIES…) are labeled. CLAIM lives on the node; SOURCE or silence. The GUI is a skin — not a folder of orphan notes.",
+      },
+      {
+        heading: "From lesson → star → race",
+        body: "Meta teaches the ritual; Desk lessons point at Planet stars; Bot Factory encodes the idea; Story races stress-test it. Keep what compounds. Kill what only looked good in-sample.",
+        polyglotIds: ["overfitting"],
+      },
+      {
+        heading: "Open the sky",
+        body: "Orbit Meta Learning + Polyglot on the Planet, then jump into a bilingual lesson strip with your saved language pair.",
       },
     ],
   },

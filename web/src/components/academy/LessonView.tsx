@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -12,18 +12,36 @@ import {
   stashChallenge,
   type AcademyProgress,
 } from "@/lib/academy";
+import {
+  lexiconForLesson,
+  loadLangSettings,
+  saveLangSettings,
+  type AcademyLangSettings,
+} from "@/lib/academy/polyglot";
 import { getChallengeById } from "@/lib/game/challenges";
 import AcademyShell from "./AcademyShell";
+import BilingualPanel from "./BilingualPanel";
+import LangPairSettings from "./LangPairSettings";
 import QuizBlock from "./QuizBlock";
 
 export default function LessonView({ lessonId }: { lessonId: string }) {
   const lesson = getLesson(lessonId);
   const router = useRouter();
   const [progress, setProgress] = useState<AcademyProgress | null>(null);
+  const [lang, setLang] = useState<AcademyLangSettings | null>(null);
 
   useEffect(() => {
     setProgress(loadAcademyProgress());
+    setLang(loadLangSettings());
   }, []);
+
+  const lessonUnits = useMemo(() => {
+    if (!lesson) return [];
+    return lexiconForLesson({
+      polyglotIds: lesson.polyglotIds,
+      polyglotTopics: lesson.polyglotTopics,
+    });
+  }, [lesson]);
 
   if (!lesson) {
     return (
@@ -35,7 +53,7 @@ export default function LessonView({ lessonId }: { lessonId: string }) {
     );
   }
 
-  if (!progress) {
+  if (!progress || !lang) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">Loading…</div>
     );
@@ -56,6 +74,11 @@ export default function LessonView({ lessonId }: { lessonId: string }) {
     router.push(`/?level=${encodeURIComponent(level.id)}`);
   };
 
+  const updateLang = (next: AcademyLangSettings) => {
+    saveLangSettings(next);
+    setLang(next);
+  };
+
   return (
     <AcademyShell
       title={lesson.title}
@@ -72,13 +95,27 @@ export default function LessonView({ lessonId }: { lessonId: string }) {
         ) : null}
       </div>
 
+      <div className="mb-6">
+        <LangPairSettings value={lang} onChange={updateLang} compact />
+      </div>
+
       <article className="space-y-6">
-        {lesson.sections.map((s, i) => (
-          <section key={i} className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-            {s.heading ? <h2 className="mb-2 text-lg font-bold text-white">{s.heading}</h2> : null}
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{s.body}</p>
-          </section>
-        ))}
+        {lesson.sections.map((s, i) => {
+          const sectionUnits = lexiconForLesson({ sectionIds: s.polyglotIds });
+          return (
+            <section key={i} className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
+              {s.heading ? <h2 className="mb-2 text-lg font-bold text-white">{s.heading}</h2> : null}
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{s.body}</p>
+              {sectionUnits.length && lang.dual ? (
+                <div className="mt-4 border-t border-slate-800 pt-4">
+                  <BilingualPanel units={sectionUnits} settings={lang} title="Section dual · 本节对照" />
+                </div>
+              ) : null}
+            </section>
+          );
+        })}
+
+        {lessonUnits.length ? <BilingualPanel units={lessonUnits} settings={lang} /> : null}
 
         {lesson.quiz?.length ? (
           <section>
