@@ -42,7 +42,8 @@ async function fetchText(url: string): Promise<string | null> {
         Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
       },
       redirect: "follow",
-      next: { revalidate: 600 },
+      // QuantInsti (and similar) RSS can exceed Next's 2MB data-cache limit.
+      cache: "no-store",
       signal: AbortSignal.timeout(10_000),
     } as RequestInit);
     if (!res.ok) return null;
