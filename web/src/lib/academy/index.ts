@@ -3,3 +3,4 @@ export * from "./progress";
 export * from "./challengeSession";
 export * from "./planet";
 export * from "./polyglot";
+export * from "./connectors";
