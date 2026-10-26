@@ -61,6 +61,17 @@ export default function LearningPlanet() {
     if (selected.id === "domain-meta" || selected.id === "c-paper-muscle" || selected.id === "drill-meta-probe") {
       return lexiconByTopic("meta");
     }
+    if (
+      selected.id === "domain-quant26" ||
+      selected.id === "bridge-quant26" ||
+      selected.id === "paper-tradefm" ||
+      selected.id === "paper-agentic-survey"
+    ) {
+      return lexiconForLesson({
+        polyglotIds: ["risk-neutral", "lob-foundation", "agentic-quant", "nash-mm", "paper-muscle"],
+        polyglotTopics: ["pricing", "microstructure"],
+      });
+    }
     if (selected.id === "paper-mm-eq" || selected.id === "c-nash" || selected.id === "c-spread") {
       return lexiconForLesson({
         polyglotIds: ["nash-mm", "bid-ask", "paper-muscle"],

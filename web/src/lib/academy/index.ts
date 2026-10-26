@@ -4,3 +4,4 @@ export * from "./challengeSession";
 export * from "./planet";
 export * from "./polyglot";
 export * from "./connectors";
+export * from "./quant2026";

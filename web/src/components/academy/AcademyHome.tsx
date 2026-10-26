@@ -52,7 +52,23 @@ export default function AcademyHome() {
         <LangPairSettings value={lang} onChange={updateLang} />
       </div>
 
-      <div className="mb-8 grid gap-4 lg:grid-cols-2">
+      <div className="mb-8 grid gap-4 lg:grid-cols-3">
+        <Link
+          href="/academy/tracks/quant26"
+          data-testid="academy-quant26-portal"
+          className="group relative overflow-hidden rounded-2xl border border-teal-500/30 bg-[#041512] p-6 transition hover:border-teal-400/50"
+        >
+          <div className="pointer-events-none absolute -right-6 -top-8 h-32 w-32 rounded-full bg-teal-500/15 blur-3xl transition group-hover:bg-teal-400/25" />
+          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-teal-400">New · Quant 2026</p>
+          <h2 className="mt-1 text-2xl font-extrabold text-white">Classical ladder × 2026 desk</h2>
+          <p className="mt-2 text-sm text-slate-400">
+            Shreve-shaped foundations bridged to LOB FMs, RL makers, and agentic quant surveys.
+          </p>
+          <span className="mt-4 inline-flex rounded-md bg-teal-500 px-4 py-2 text-sm font-bold text-slate-950 group-hover:bg-teal-400">
+            Open Quant 2026 →
+          </span>
+        </Link>
+
         <Link
           href="/academy/tracks/meta"
           data-testid="academy-meta-portal"
@@ -92,7 +108,7 @@ export default function AcademyHome() {
               </span>
             </h2>
             <p className="mt-2 max-w-2xl text-sm text-slate-400">
-              mindcraft-style KG — market making, meta/polyglot, interview arena, desk library.
+              KG sky — Quant 2026 papers, meta/polyglot, interview arena, desk library.
             </p>
             <span className="mt-4 inline-flex rounded-md bg-rose-500 px-5 py-2 text-sm font-bold text-slate-950 group-hover:bg-rose-400">
               Enter the planet →

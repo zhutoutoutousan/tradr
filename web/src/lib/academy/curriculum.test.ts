@@ -8,13 +8,21 @@ import {
 } from "./progress";
 
 describe("academy curriculum", () => {
-  it("has seven tracks including meta and unique lesson ids", () => {
-    expect(TRACKS).toHaveLength(7);
+  it("has eight tracks including quant26/meta and unique lesson ids", () => {
+    expect(TRACKS).toHaveLength(8);
     const ids = LESSONS.map((l) => l.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(TRACKS.some((t) => t.id === "desk")).toBe(true);
     expect(TRACKS.some((t) => t.id === "meta")).toBe(true);
+    expect(TRACKS.some((t) => t.id === "quant26")).toBe(true);
     expect(lessonsForTrack("meta").length).toBeGreaterThanOrEqual(4);
+    expect(lessonsForTrack("quant26").length).toBeGreaterThanOrEqual(12);
+  });
+
+  it("quant26 capstone points at lab and paper muscle", () => {
+    const cap = getLesson("q26-13-capstone");
+    expect(cap?.botLabHref).toBe("/bots/lab");
+    expect(cap?.polyglotIds).toContain("paper-muscle");
   });
 
   it("meta lessons carry polyglot tags", () => {
