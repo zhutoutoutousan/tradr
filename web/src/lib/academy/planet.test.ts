@@ -61,4 +61,12 @@ describe("learning planet graph", () => {
     expect(getPlanetNode("c-dual-subtitle")?.href).toContain("meta-03");
     expect(getPlanetDrill("drill-meta-probe")?.choices.filter((c) => c.correct)).toHaveLength(1);
   });
+
+  it("includes Quant 2026 domain and research stars", () => {
+    expect(getPlanetNode("domain-quant26")?.href).toBe("/academy/tracks/quant26");
+    expect(getPlanetNode("paper-tradefm")?.source?.url).toContain("2602.23784");
+    expect(getPlanetNode("paper-agentic-survey")?.source?.url).toContain("2608.31041");
+    expect(getPlanetDrill("drill-lob-fm")?.choices.filter((c) => c.correct)).toHaveLength(1);
+  });
 });
+

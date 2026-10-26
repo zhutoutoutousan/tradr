@@ -195,6 +195,48 @@ export const QUANT_LEXICON: PolyglotUnit[] = [
       ru: "Двойные субтитры — два языка на одной концептуальной картинке.",
     },
   },
+  {
+    id: "risk-neutral",
+    topic: "pricing",
+    concept: "Risk-neutral measure",
+    texts: {
+      en: "Risk-neutral measure — a pricing probability that turns discounted assets into martingales.",
+      zh: "风险中性测度——使折现资产成为鞅的定价概率。",
+      de: "Risikoneutrales Maß — Preismaß, unter dem diskontierte Assets Martingale sind.",
+      fr: "Mesure risque-neutre — probabilité de pricing qui rend les actifs actualisés martingales.",
+      es: "Medida libre de riesgo — probabilidad de pricing que vuelve martingalas a los activos descontados.",
+      ja: "リスク中立測度——割引資産をマルチンゲールにする価格付け確率。",
+      ru: "Риск-нейтральная мера — вероятностная мера, при которой дисконтированные активы — мартингалы.",
+    },
+  },
+  {
+    id: "lob-foundation",
+    topic: "microstructure",
+    concept: "LOB foundation model",
+    texts: {
+      en: "LOB foundation model — generative model of order events and/or book state for simulation.",
+      zh: "订单簿基础模型——生成订单事件和/或簿状态以做仿真。",
+      de: "LOB-Foundation-Modell — generatives Modell für Order-Events und/oder Book-State.",
+      fr: "Modèle de fondation LOB — modèle génératif d'événements d'ordres et/ou d'état du carnet.",
+      es: "Modelo fundacional LOB — generativo de eventos de órdenes y/o estado del libro.",
+      ja: "LOB基盤モデル——注文イベントや板状態を生成するモデル。",
+      ru: "Фундаментальная модель LOB — генерация событий заявок и/или состояния стакана.",
+    },
+  },
+  {
+    id: "agentic-quant",
+    topic: "meta",
+    concept: "Agentic quant workflow",
+    texts: {
+      en: "Agentic quant — tool-using agents across factor → portfolio → execution → risk, with matched eval.",
+      zh: "智能体量化——因子→组合→执行→风控的工具型智能体，并匹配评估。",
+      de: "Agentic Quant — Tool-Agenten über Faktor → Portfolio → Execution → Risiko mit passender Eval.",
+      fr: "Quant agentique — agents outillés factor → portefeuille → exécution → risque, eval alignée.",
+      es: "Quant agéntico — agentes con herramientas en factor → cartera → ejecución → riesgo.",
+      ja: "エージェンティッククオンツ——因子→ポートフォリオ→執行→リスクをツールで回し評価を合わせる。",
+      ru: "Агентный квант — агенты с инструментами: фактор → портфель → исполнение → риск.",
+    },
+  },
 ];
 
 export function lexiconByTopic(topic?: string): PolyglotUnit[] {

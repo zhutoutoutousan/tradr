@@ -4,6 +4,8 @@
  * Deliberately does NOT include WorldQuant Alpha101 paper formulas.
  */
 
+import { QUANT26_LESSONS, QUANT26_TRACK } from "./quant2026";
+
 export type TrackId =
   | "foundations"
   | "signals"
@@ -11,7 +13,8 @@ export type TrackId =
   | "agents"
   | "campaign"
   | "desk"
-  | "meta";
+  | "meta"
+  | "quant26";
 
 export type LessonKind = "read" | "quiz" | "lab" | "play";
 
@@ -125,9 +128,10 @@ export const TRACKS: AcademyTrack[] = [
     icon: "◇",
     requires: { trackId: "foundations", lessons: 1 },
   },
+  QUANT26_TRACK,
 ];
 
-export const LESSONS: AcademyLesson[] = [
+const CORE_LESSONS: AcademyLesson[] = [
   // ── Foundations ─────────────────────────────────────────────
   {
     id: "fnd-01-race",
@@ -898,6 +902,8 @@ export const LESSONS: AcademyLesson[] = [
     ],
   },
 ];
+
+export const LESSONS: AcademyLesson[] = [...CORE_LESSONS, ...QUANT26_LESSONS];
 
 export function getTrack(id: string): AcademyTrack | undefined {
   return TRACKS.find((t) => t.id === id);

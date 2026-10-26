@@ -7,6 +7,7 @@ const NAV: { href: string; label: string; exact?: boolean }[] = [
   { href: "/academy", label: "Hub", exact: true },
   { href: "/academy/planet", label: "Planet" },
   { href: "/academy/tracks/meta", label: "Meta" },
+  { href: "/academy/tracks/quant26", label: "Quant26" },
   { href: "/academy/story", label: "Story" },
   { href: "/bots", label: "Bot Factory" },
 ];
