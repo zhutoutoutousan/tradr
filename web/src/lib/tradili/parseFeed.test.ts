@@ -38,6 +38,12 @@ describe("parseFeed", () => {
     expect(items[0].kind).toBe("news");
   });
 
+  it("tags RSS as blog when requested", () => {
+    const items = parseRssItems(RSS, "Quantocracy", 1, "blog");
+    expect(items[0].kind).toBe("blog");
+    expect(items[0].id.startsWith("blog-")).toBe(true);
+  });
+
   it("decodes numeric HTML entities in titles", () => {
     const xml = `<?xml version="1.0"?><rss><channel><item>
       <title>&#x2018;Hello&#x2019; &amp; markets</title>

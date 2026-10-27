@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs/config";
 
 const nextConfig: NextConfig = {
+  // Cloud Agent / local browsers often hit 127.0.0.1 while Next binds to localhost.
+  // Without this, /_next HMR is blocked and client components never hydrate.
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   // Always revalidate HTML documents so phones never run a stale cached build
   // of the multiplayer pages during pilot testing. Hashed JS/CSS chunks under
   // /_next/static stay long-cached as usual (excluded below).

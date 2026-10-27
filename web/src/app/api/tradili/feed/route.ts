@@ -5,9 +5,9 @@ export const revalidate = 600;
 
 export async function GET() {
   try {
-    const { news, papers } = await fetchTradiliInfoFeed();
+    const { news, blogs, papers } = await fetchTradiliInfoFeed();
     return NextResponse.json(
-      { news, papers, fetchedAt: new Date().toISOString() },
+      { news, blogs, papers, fetchedAt: new Date().toISOString() },
       {
         headers: {
           "Cache-Control": "public, s-maxage=600, stale-while-revalidate=1800",
@@ -16,6 +16,9 @@ export async function GET() {
     );
   } catch (err) {
     console.warn("tradili feed failed", err);
-    return NextResponse.json({ news: [], papers: [], fetchedAt: new Date().toISOString() }, { status: 200 });
+    return NextResponse.json(
+      { news: [], blogs: [], papers: [], fetchedAt: new Date().toISOString() },
+      { status: 200 },
+    );
   }
 }

@@ -9,7 +9,7 @@ import {
 } from "@/lib/game/anonymousGames";
 import type { FeedItem } from "@/lib/tradili/parseFeed";
 
-type Tab = "races" | "news" | "papers" | "all";
+type Tab = "races" | "news" | "blogs" | "papers" | "all";
 
 const PAGE_SIZE = 24;
 
@@ -41,6 +41,7 @@ export default function TradiliFeed() {
   const [tab, setTab] = useState<Tab>("races");
   const [games, setGames] = useState<CommunityGame[]>([]);
   const [news, setNews] = useState<FeedItem[]>([]);
+  const [blogs, setBlogs] = useState<FeedItem[]>([]);
   const [papers, setPapers] = useState<FeedItem[]>([]);
   const [loadingGames, setLoadingGames] = useState(true);
   const [loadingInfo, setLoadingInfo] = useState(true);
@@ -80,14 +81,16 @@ export default function TradiliFeed() {
     setLoadingInfo(true);
     fetch("/api/tradili/feed", { cache: "no-store" })
       .then((r) => r.json())
-      .then((data: { news?: FeedItem[]; papers?: FeedItem[] }) => {
+      .then((data: { news?: FeedItem[]; blogs?: FeedItem[]; papers?: FeedItem[] }) => {
         if (cancelled) return;
         setNews(Array.isArray(data.news) ? data.news : []);
+        setBlogs(Array.isArray(data.blogs) ? data.blogs : []);
         setPapers(Array.isArray(data.papers) ? data.papers : []);
       })
       .catch(() => {
         if (!cancelled) {
           setNews([]);
+          setBlogs([]);
           setPapers([]);
         }
       })
@@ -130,6 +133,7 @@ export default function TradiliFeed() {
 
   const showRaces = tab === "races" || tab === "all";
   const showNews = tab === "news" || tab === "all";
+  const showBlogs = tab === "blogs" || tab === "all";
   const showPapers = tab === "papers" || tab === "all";
 
   return (
@@ -139,7 +143,7 @@ export default function TradiliFeed() {
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-rose-400">Tradili</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-100 sm:text-3xl">Race tapes &amp; market feed</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
-            Bilibili × YouTube × Tradr — watch past races, skim finance headlines, and open quant papers from arXiv.
+            Race tapes, free finance RSS, quant blogs (Quantocracy / Robot Wealth / …), and arXiv q-fin papers.
           </p>
         </div>
       </div>
@@ -152,6 +156,7 @@ export default function TradiliFeed() {
           [
             ["races", `Races${games.length ? ` · ${games.length}${hasMore ? "+" : ""}` : ""}`],
             ["news", `Markets${news.length ? ` · ${news.length}` : ""}`],
+            ["blogs", `Quant blogs${blogs.length ? ` · ${blogs.length}` : ""}`],
             ["papers", `Papers${papers.length ? ` · ${papers.length}` : ""}`],
             ["all", "For you"],
           ] as const
@@ -238,11 +243,33 @@ export default function TradiliFeed() {
         </section>
       ) : null}
 
+      {showBlogs ? (
+        <section className="mb-10" data-testid="tradili-blogs">
+          <div className="mb-3 flex items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Quant blogs</h2>
+            <p className="text-[11px] text-slate-600">Quantocracy · Robot Wealth · QuantInsti · Alpha Architect</p>
+          </div>
+          {loadingInfo ? (
+            <p className="text-sm text-slate-500">Pulling blog feeds…</p>
+          ) : blogs.length === 0 ? (
+            <p className="rounded-xl border border-slate-800 bg-slate-900/40 px-4 py-6 text-sm text-slate-500">
+              Quant blog RSS unavailable right now — papers tab still works.
+            </p>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {blogs.slice(0, tab === "all" ? 8 : 24).map((item) => (
+                <InfoRow key={item.id} item={item} accent="emerald" />
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
+
       {showPapers ? (
         <section className="mb-6" data-testid="tradili-papers">
           <div className="mb-3 flex items-baseline justify-between gap-2">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Research rack</h2>
-            <p className="text-[11px] text-slate-600">arXiv q-fin.TR / CP / ST</p>
+            <p className="text-[11px] text-slate-600">arXiv q-fin · RSS + API</p>
           </div>
           <a
             href="https://arxiv.org/abs/2610.30891"
@@ -345,18 +372,22 @@ function RaceCard({ game: g }: { game: CommunityGame }) {
   );
 }
 
-function InfoRow({ item, accent }: { item: FeedItem; accent: "sky" | "amber" }) {
+function InfoRow({ item, accent }: { item: FeedItem; accent: "sky" | "amber" | "emerald" }) {
   const badge =
     accent === "sky"
       ? "bg-sky-500/15 text-sky-300"
-      : "bg-amber-500/15 text-amber-300";
+      : accent === "emerald"
+        ? "bg-emerald-500/15 text-emerald-300"
+        : "bg-amber-500/15 text-amber-300";
+  const testId =
+    item.kind === "news" ? "tradili-news-item" : item.kind === "blog" ? "tradili-blog-item" : "tradili-paper-item";
   return (
     <a
       href={item.url}
       target="_blank"
       rel="noopener noreferrer"
       className="block min-w-0 rounded-xl border border-slate-800 bg-slate-900/40 px-3 py-3 transition hover:border-slate-600 hover:bg-slate-900"
-      data-testid={item.kind === "news" ? "tradili-news-item" : "tradili-paper-item"}
+      data-testid={testId}
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${badge}`}>{item.source}</span>
