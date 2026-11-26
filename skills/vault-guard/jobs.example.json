@@ -1,0 +1,14 @@
+{
+  "jobs": {
+    "inflow-news": {
+      "command": ["python", "cron/inflow-news.py"],
+      "keys": ["IMAP_USER", "IMAP_PASS"],
+      "env": "minimal"
+    },
+    "imap-triage": {
+      "command": ["python", ".cursor/skills/imap-mail-triage/scripts/triage.py", "--apply", "--backlog", "--limit", "400"],
+      "keys": ["GMAIL_IMAP_USER", "GMAIL_IMAP_PASS"],
+      "env": "minimal"
+    }
+  }
+}

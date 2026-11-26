@@ -4,3 +4,11 @@ debug.log
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# vault-guard: never commit these
+vault/qr*
+vault/*.svg
+vault/*.pass
+vault/totp*
+vault/audit.log
+vault/all-secrets*.json

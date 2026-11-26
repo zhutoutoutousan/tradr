@@ -1,0 +1,13 @@
+{
+  "v": 1,
+  "kdf": "scrypt",
+  "n": 32768,
+  "r": 8,
+  "p": 1,
+  "salt": "3/IDRzgUZ5jGTNViVx+59x0Wkd1kbyRqA2oA91E06vg=",
+  "nonce": "C4nw5ckOs9KqUK/t",
+  "wrapped": "4iSh+5dkxmtYSQK18mZG+Y5UndHSkbA9RB7mT8PbMplTSK9mDWWPFE/I96+zzoZl",
+  "totp": true,
+  "day": "2026-11-25",
+  "day_shift": 25
+}
