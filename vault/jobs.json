@@ -1,0 +1,14 @@
+{
+  "jobs": {
+    "portal": {
+      "command": ["python", "cron/review-cards.py", "--serve", "--port", "8797"],
+      "keys": ["REMOTE_GATE_TOKEN", "PHONEBRIDGE_TOKEN", "PORTAL_COOKIE_KEY"],
+      "env": "inherit"
+    },
+    "remote": {
+      "command": ["python", "cron/remote-control.py", "--port", "8802"],
+      "keys": ["REMOTE_GATE_TOKEN"],
+      "env": "inherit"
+    }
+  }
+}

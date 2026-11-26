@@ -39,6 +39,7 @@ import hmac
 import json
 import os
 import struct
+import subprocess
 import sys
 import tempfile
 import time
@@ -435,6 +436,12 @@ def _exec_with(directory: Path, command: list[str], selected: dict[str, str], ar
         print(f"would inject ({len(selected)}): {', '.join(sorted(selected)) or '-'}")
         return
     audit(directory, action, selected, command)
+    if os.name == "nt":
+        # Windows: os.execv* starts the child but never hands over the console, so the
+        # job never comes up. Spawn it; the keys exist only in the child's environment
+        # once Popen returns.
+        subprocess.Popen(command, env=env)
+        return
     # execvpe replaces this process: no parent copy of the secrets stays resident.
     os.execvpe(command[0], command, env)
 
