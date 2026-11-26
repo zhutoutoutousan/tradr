@@ -593,7 +593,7 @@ def cmd_self_test(_args) -> None:
     with tempfile.TemporaryDirectory() as tmp:
         directory = Path(tmp) / "v"
         directory.mkdir()
-        secret = base64.b32encode(os.urandom(20)).decode().rstrip("=")
+        secret = base64.b32encode(os.urandom(20)).decode().rstrip("=")  # desensitize:ignore
         passphrase = "correct horse battery staple 42"  # desensitize:ignore
         salt, dek = os.urandom(32), os.urandom(32)
         nonce = os.urandom(12)
