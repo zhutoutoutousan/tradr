@@ -594,7 +594,7 @@ def cmd_self_test(_args) -> None:
         directory = Path(tmp) / "v"
         directory.mkdir()
         secret = base64.b32encode(os.urandom(20)).decode().rstrip("=")
-        passphrase = "correct horse battery staple 42"
+        passphrase = "correct horse battery staple 42"  # desensitize:ignore
         salt, dek = os.urandom(32), os.urandom(32)
         nonce = os.urandom(12)
         wrapped = AESGCM(derive_kek(passphrase, secret, salt, 25)).encrypt(nonce, dek, AAD_KEYWRAP)
